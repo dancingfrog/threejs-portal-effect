@@ -4,6 +4,8 @@ import { XRDevice, metaQuest3 } from 'iwer';
 import { DevUI } from '@iwer/devui';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
+import Stats from "https://unpkg.com/three@0.118.3/examples/jsm/libs/stats.module.js";
+
 import setupScene from "./setup/setupScene";
 
 const mapLayers = new Map();
@@ -78,12 +80,6 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
         height: window.innerHeight, // 480,
     };
 
-    const portalCanvas = document.createElement('canvas');
-    const ctx = portalCanvas.getContext("webgl2");
-
-    ctx.canvas.width = previewWindow.width;
-    ctx.canvas.height = previewWindow.height;
-
     // Setup Renderer
     const portalRenderer = new THREE.WebGLRenderer({
         antialias: true,
@@ -93,47 +89,14 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
 
     const texture = new THREE.CanvasTexture(portalRenderer.domElement);
 
-    const testCanvas = document.createElement('canvas');
-    const testCtx = testCanvas.getContext('2d');
-    const testTexture = new THREE.CanvasTexture(testCanvas);
-
-    testCtx.canvas.width = previewWindow.width;
-    testCtx.canvas.height = previewWindow.height;
-
-    testCtx.fillStyle = "transparent";
-    testCtx.fillRect(0, 0, testCtx.canvas.width, testCtx.canvas.height);
-
-    function randInt(min, max) {
-        if (max === undefined) {
-            max = min;
-            min = 0;
-        }
-        return Math.random() * (max - min) + min | 0;
-    }
-
-    function drawRandomDot() {
-        testCtx.strokeStyle = `#${randInt(0x1000000).toString(16).padStart(6, '0')}`;
-        testCtx.fillStyle = `#${randInt(0x1000000).toString(16).padStart(6, '0')}`;
-        testCtx.beginPath();
-
-        const x = randInt(testCtx.canvas.width);
-        const y = randInt(testCtx.canvas.height);
-        const radius = randInt(10, 64);
-        testCtx.arc(x, y, radius, 0, Math.PI * 2);
-        testCtx.stroke();
-        testCtx.fill();
-    }
-
-    for (let i = 0; i < 1000; i++) {
-        drawRandomDot();
-    }
-
     const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(previewWindow.width, previewWindow.height);
     renderer.xr.enabled = true;
 
-    const resolution = new THREE.Vector2();
+    function resizeRenderer(width, height) {
+        renderer.setSize(width, height);
+    }
 
     portalRenderer.localClippingEnabled = true;
     renderer.localClippingEnabled = true;
@@ -142,9 +105,12 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
     document.body.appendChild(renderer.domElement);
     renderer.domElement.style.display = "inline-block";
 
-    function resizeRenderer(width, height) {
-        renderer.setSize(width, height);
-    }
+    const resolution = new THREE.Vector2();
+
+    // Setup Stats
+    const stats = new Stats();
+    stats.showPanel(0);
+    document.body.appendChild(stats.dom);
 
     // Setup Scene
     const scene = new THREE.Scene();
@@ -309,8 +275,9 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
     scene.add(portalMesh);
 
     function animate() {
-        requestAnimationFrame(animate);
+        // requestAnimationFrame(animate);
 
+        stats.begin();
         testPortalBounds();
 
         updateTorus();
@@ -319,7 +286,10 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
 
         renderPortal();
         renderWorld();
+        stats.end();
     }
+
+    renderer.setAnimationLoop(animate);
 
     function updateTorus() {
         torusMesh.rotation.x += 0.01;
