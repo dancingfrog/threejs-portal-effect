@@ -89,8 +89,8 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
     }
 
     const previewWindow = {
-        width: window.innerWidth, // / 2, // 640,
-        height: window.innerHeight + 10, // 480,
+        width: window.innerWidth / 2, // 640,
+        height: window.innerHeight, // 480,
     };
 
 //     const body = document.body,
@@ -100,25 +100,81 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
 //
 //     console.log(container);
 //
-    const canvas= window.document.createElement('canvas');
+//     const canvas = window.document.createElement('canvas');
+//     canvas.width = window.innerWidth / 2;
+//     canvas.height = window.innerHeight;
 
-    const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+    const portalCanvas = document.createElement('canvas');
+    const ctx = portalCanvas.getContext("webgl2");
+
+    ctx.canvas.width = previewWindow.width;
+    ctx.canvas.height = previewWindow.height;
+
+// Setup Renderer
+//     const portalRenderer = new THREE.WebGLRenderer({
+//         antialias: true
+//     });
+    const portalRenderer = new THREE.WebGLRenderer({
+        antialias: true,
+        // canvas: portalCanvas
+    });
+    portalRenderer.setPixelRatio(window.devicePixelRatio);
+    portalRenderer.setSize(previewWindow.width, previewWindow.height);
+    portalRenderer.xr.enabled = true;
+    portalRenderer.xr.enabled = false;
+    portalRenderer.localClippingEnabled = false;
+    // portalRenderer.localClippingEnabled = true;
+
+    const texture = new THREE.CanvasTexture(portalRenderer.domElement);
+
+    const testCanvas = document.createElement('canvas');
+    const testCtx = testCanvas.getContext('2d');
+    const testTexture = new THREE.CanvasTexture(testCanvas);
+
+    testCtx.canvas.width = previewWindow.width;
+    testCtx.canvas.height = previewWindow.height;
+
+    testCtx.fillStyle = "transparent";
+    testCtx.fillRect(0, 0, testCtx.canvas.width, testCtx.canvas.height);
+
+    function randInt(min, max) {
+        if (max === undefined) {
+            max = min;
+            min = 0;
+        }
+        return Math.random() * (max - min) + min | 0;
+    }
+
+    function drawRandomDot() {
+        testCtx.strokeStyle = `#${randInt(0x1000000).toString(16).padStart(6, '0')}`;
+        testCtx.fillStyle = `#${randInt(0x1000000).toString(16).padStart(6, '0')}`;
+        testCtx.beginPath();
+
+        const x = randInt(testCtx.canvas.width);
+        const y = randInt(testCtx.canvas.height);
+        const radius = randInt(10, 64);
+        testCtx.arc(x, y, radius, 0, Math.PI * 2);
+        testCtx.stroke();
+        testCtx.fill();
+    }
+
+    for (let i = 0; i < 1000; i++) {
+        drawRandomDot();
+    }
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.setPixelRatio(window.devicePixelRatio);
     renderer.setSize(previewWindow.width, previewWindow.height);
     renderer.xr.enabled = true;
-//
-//     console.log(renderer.domElement);
-//
-//     container.appendChild(renderer.domElement);
 
     const resolution = new THREE.Vector2();
 
-// Setup Renderer
-//     const renderer = new THREE.WebGLRenderer({
-//         antialias: true
-//     });
+    portalRenderer.localClippingEnabled = true;
     renderer.localClippingEnabled = true;
+    document.body.appendChild(portalRenderer.domElement);
+    portalRenderer.domElement.style.display = "inline-block";
     document.body.appendChild(renderer.domElement);
+    renderer.domElement.style.display = "inline-block";
 
     function resizeRenderer(width, height) {
         renderer.setSize(width, height);
@@ -127,7 +183,7 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
 // Setup Portal RenderTarget
     const renderTarget = new THREE.WebGLRenderTarget(1, 1);
 
-    function resizePortalRenderTarget(width, height) {
+    function resizePortalRenderTarget( width, height) {
         renderTarget.setSize(width, height);
     }
 
@@ -502,7 +558,11 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
     function createPortal(size) {
         const geometry = new THREE.PlaneGeometry(size, size);
         const material = new THREE.MeshBasicMaterial({
-            map: renderTarget.texture
+            // map: testTexture,
+            map: texture,
+            // map: renderTarget.texture,
+            opacity: 1.0,
+            side: THREE.DoubleSide,
         });
         material.onBeforeCompile = (shader) => {
             shader.uniforms.uResolution = new THREE.Uniform(resolution);
@@ -521,6 +581,7 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
     `
             );
         };
+
         return new THREE.Mesh(geometry, material);
     }
 
@@ -642,8 +703,15 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
             .add(worldDirection.multiplyScalar(0.01));
     }
 
+    // const environment = new RoomEnvironment(renderer);
+    // const pmremGenerator = new THREE.PMREMGenerator(renderer);
+    // scene.environment = pmremGenerator.fromScene(environment).texture; // <= light + texture for quest controllers
+
     function renderPortal() {
-        renderer.clippingPlanes = isInsidePortal
+        // renderer.clippingPlanes = isInsidePortal
+        //     ? globalPlaneInside
+        //     : globalPlaneOutside;
+        portalRenderer.clippingPlanes = isInsidePortal
             ? globalPlaneInside
             : globalPlaneOutside;
 
@@ -652,20 +720,22 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
             : globalPlaneOutside;
 
         camera.layers.disable(mapLayers.get("portal"));
-        if (isInsidePortal) {
-            camera.layers.disable(mapLayers.get("inside"));
-            camera.layers.enable(mapLayers.get("outside"));
-        } else {
+        // if (isInsidePortal) {
+        //     camera.layers.disable(mapLayers.get("inside"));
+        //     camera.layers.enable(mapLayers.get("outside"));
+        // } else {
             camera.layers.disable(mapLayers.get("outside"));
             camera.layers.enable(mapLayers.get("inside"));
-        }
+        // }
 
-        renderer.setRenderTarget(renderTarget);
-        renderer.render(scene, camera);
+        portalRenderer.render(scene, camera);
+        // renderer.setRenderTarget(renderTarget);
+        // renderer.render(scene, camera);
     }
 
     function renderWorld() {
-        renderer.clippingPlanes = [];
+        // renderer.clippingPlanes = [];
+        portalRenderer.clippingPlanes = [];
 
         torusMesh.material.clippingPlanes = isInsidePortal
             ? globalPlaneOutside
@@ -677,15 +747,17 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
         //     : THREE.BackSide;
 
         camera.layers.enable(mapLayers.get("portal"));
-        if (isInsidePortal) {
+        // if (isInsidePortal) {
             camera.layers.disable(mapLayers.get("outside"));
-            camera.layers.enable(mapLayers.get("inside"));
-        } else {
+        //     camera.layers.enable(mapLayers.get("inside"));
+        // } else {
             camera.layers.disable(mapLayers.get("inside"));
-            camera.layers.enable(mapLayers.get("outside"));
-        }
+        //     camera.layers.enable(mapLayers.get("outside"));
+        // }
 
-        renderer.setRenderTarget(null);
+        texture.needsUpdate = true;
+        // portalRenderer.render(scene, camera);
+        // renderer.setRenderTarget(null);
         renderer.render(scene, camera);
     }
 
@@ -699,7 +771,7 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
 //     window.addEventListener('resize', onWindowResize);
 
     function resize() {
-        const width = window.innerWidth;
+        const width = previewWindow.width;
         const height = window.innerHeight;
 
         resolution.set(width, height);
