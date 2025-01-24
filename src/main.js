@@ -3,6 +3,7 @@ import * as THREE from "three";
 import { XRDevice, metaQuest3 } from 'iwer';
 import { DevUI } from '@iwer/devui';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { HTMLMesh } from 'three/addons/interactive/HTMLMesh.js';
 
 import Stats from "https://unpkg.com/three@0.118.3/examples/jsm/libs/stats.module.js";
 
@@ -112,8 +113,17 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
     stats.showPanel(0);
     document.body.appendChild(stats.dom);
 
+    const statsMesh = new HTMLMesh( stats.dom );
+    statsMesh.position.x = -1;
+    statsMesh.position.y = 1;
+    statsMesh.position.z = 0.1;
+    statsMesh.rotation.y = Math.PI / 4;
+    statsMesh.scale.setScalar( 2 );
+
     // Setup Scene
     const scene = new THREE.Scene();
+
+    scene.add( statsMesh );
 
     const camera = new THREE.PerspectiveCamera(
         50,
@@ -287,6 +297,9 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
         renderPortal();
         renderWorld();
         stats.end();
+
+        // Canvas elements doesn't trigger DOM updates, so we have to update the texture
+        statsMesh.material.map.update();
     }
 
     renderer.setAnimationLoop(animate);
