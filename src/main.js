@@ -11,6 +11,16 @@ import Stats from "https://unpkg.com/three@0.118.3/examples/jsm/libs/stats.modul
 
 import setupScene from "./setup/setupScene";
 
+
+// Helper function to set nested meshes to layers
+// https://github.com/mrdoob/three.js/issues/10959
+function setLayer(object, layer) {
+    object.layers.set(layer);
+    object.traverse(function (child) {
+        child.layers.set(layer);
+    });
+}
+
 const mapLayers = new Map();
 mapLayers.set("inside", 1);
 mapLayers.set("outside", 2);
@@ -197,21 +207,6 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
         // gripSpace.visible = false;
     }
 
-    // Setup Clipping planes
-    const globalPlaneInside = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
-    const globalPlaneOutside = new THREE.Plane(new THREE.Vector3(0, 0, -1), 0);
-    const clipplingDirectionBottom = new THREE.Vector3(0, 1, 0);
-    const globalPlaneBottom = new THREE.Plane(clipplingDirectionBottom, -0.999);
-
-    // Helper function to set nested meshes to layers
-    // https://github.com/mrdoob/three.js/issues/10959
-    function setLayer(object, layer) {
-        object.layers.set(layer);
-        object.traverse(function (child) {
-            child.layers.set(layer);
-        });
-    }
-
     // Setup Light
     const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
     directionalLight.position.set(0, 1, 1);
@@ -318,8 +313,8 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
         return new THREE.Mesh(geometry, material);
     }
 
-    function createSphere(color) {
-        const geometry = new THREE.SphereGeometry(2, 32, 32);
+    function createSphere (size, color) {
+        const geometry = new THREE.SphereGeometry(size, 32, 32);
         const material = new THREE.MeshPhysicalMaterial({
             color,
             side: THREE.BackSide
@@ -390,7 +385,7 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
     setLayer(shelfInsideMesh, mapLayers.get("inside"));
     scene.add(shelfInsideMesh);
 
-    const skyInsideMesh = createSphere(mapColors.get("orangeDark"));
+    const skyInsideMesh = createSphere(2, mapColors.get("orangeDark"));
     setLayer(skyInsideMesh, mapLayers.get("inside"));
     scene.add(skyInsideMesh);
 
@@ -491,6 +486,10 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
     setLayer(line, mapLayers.get("outside"));
     scene.add( line );
 
+    // Setup Clipping planes
+    const clippingPlaneInside = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+    const clippingPlaneOutside = new THREE.Plane(new THREE.Vector3(0, 0, -1), 0);
+
     function renderPortal() {
 
         camera.layers.disable(mapLayers.get("portal"));
@@ -503,15 +502,15 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
         // }
 
         torusMesh.material.clippingPlanes = isInsidePortal ? [
-            globalPlaneInside
+            clippingPlaneInside
         ] : [
-            globalPlaneOutside
+            clippingPlaneOutside
         ];
 
         portalRenderer.clippingPlanes = (isInsidePortal) ? [
-            globalPlaneInside
+            clippingPlaneInside
         ] : [
-            globalPlaneOutside
+            clippingPlaneOutside
         ];
 
         portalRenderer.render(scene, camera);
@@ -548,9 +547,23 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
 
         // console.log(xrCameraA);
 
+        const viewingPlaneLeft = -1; // x left
+        const viewingPlaneRight = 2; // x right
+        const viewingPlaneTop = 2; // y top
+        const viewingPlaneBottom = 1; // y bottom
+        const viewingPlaneDepth = 0; // z
+
+        const clippingBottomDirection = new THREE.Vector3(0, 1, 0);
+        const clippingBottomP = new THREE.Vector3(xrCameraA.x, viewingPlaneBottom, viewingPlaneDepth);
+        const clippingBottomY = 0.001 - viewingPlaneBottom;
+        const clippingBottomPlane = new THREE.Plane(clippingBottomDirection, clippingBottomY);
+
+        let vDBottom = new THREE.Vector3();
+        vDBottom.subVectors(clippingBottomP, xrCameraA);
+
         // Create points on a line
-        points[0] = xrCameraA; // new THREE.Vector3( 0, 1.0, -0.0 );
-        points[1] = getDirectionalEndPoint(points[0], xrCameraDirection);
+        points[0] = clippingBottomP; // xrCameraA; // new THREE.Vector3( 0, 1.0, -0.0 );
+        points[1] = getDirectionalEndPoint(points[0], vDBottom); // xrCameraDirection);
         lineGeometry.setFromPoints(points)
 
         line.geometry = lineGeometry;
@@ -561,11 +574,11 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
         torusMesh.material.clippingPlanes = null;
 
         // renderer.clippingPlanes = (isInsidePortal) ? [
-        //     globalPlaneInside,
-        //     globalPlaneBottom
+        //     clippingPlaneInside,
+        //     clippingBottomPlane
         // ] : [
-        //     globalPlaneOutside,
-        //     globalPlaneBottom
+        //     clippingPlaneOutside,
+        //     clippingBottomPlane
         // ];
 
         renderer.render(scene, camera);
