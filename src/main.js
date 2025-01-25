@@ -2,8 +2,10 @@ import * as THREE from "three";
 
 import { XRDevice, metaQuest3 } from 'iwer';
 import { DevUI } from '@iwer/devui';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GamepadWrapper, XR_BUTTONS } from 'gamepad-wrapper';
 import { HTMLMesh } from 'three/addons/interactive/HTMLMesh.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { XRControllerModelFactory } from "three/addons/webxr/XRControllerModelFactory.js";
 
 import Stats from "https://unpkg.com/three@0.118.3/examples/jsm/libs/stats.module.js";
 
@@ -38,6 +40,7 @@ mapKeys.set("ArrowDown", "isDown");
 mapKeys.set("d", "isRight");
 mapKeys.set("ArrowRight", "isRight");
 
+let currentSession;
 let isInsidePortal = false;
 let wasOutside = true;
 
@@ -73,11 +76,10 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
             0.9887216687202454,
         );
         new DevUI(xrDevice);
-
     }
 
     const previewWindow = {
-        width: window.innerWidth / 2, // 640,
+        width: window.innerWidth, // / 2, // 640,
         height: window.innerHeight, // 480,
     };
 
@@ -87,6 +89,10 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
     });
     portalRenderer.setPixelRatio(window.devicePixelRatio);
     portalRenderer.setSize(previewWindow.width, previewWindow.height);
+
+    function resizePortal(width, height) {
+        portalRenderer.setSize(width, height);
+    }
 
     const texture = new THREE.CanvasTexture(portalRenderer.domElement);
 
@@ -106,6 +112,13 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
     document.body.appendChild(renderer.domElement);
     renderer.domElement.style.display = "inline-block";
 
+    // Setup Scene
+    const scene = new THREE.Scene();
+
+    const player = new THREE.Group();
+
+    scene.add(player);
+
     const resolution = new THREE.Vector2();
 
     // Setup Stats
@@ -120,9 +133,6 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
     statsMesh.rotation.y = Math.PI / 4;
     statsMesh.scale.setScalar( 2 );
 
-    // Setup Scene
-    const scene = new THREE.Scene();
-
     scene.add( statsMesh );
 
     const camera = new THREE.PerspectiveCamera(
@@ -134,6 +144,11 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
     );
     camera.position.set(0, 1.6, 1);
 
+    function resizeCamera(width, height) {
+        camera.aspect = width / height;
+        camera.updateProjectionMatrix();
+    }
+
     // Setup Camera and Controls
     const cameraLookAtTarget = new THREE.Vector3(0, 0.5, -1);
     const controls = new OrbitControls(camera, renderer.domElement);
@@ -142,9 +157,42 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
     controls.target = cameraLookAtTarget;
     controls.update();
 
-    function resizeCamera(width, height) {
-        camera.aspect = width / height;
-        camera.updateProjectionMatrix();
+    const controllerModelFactory = new XRControllerModelFactory();
+    const controllers = {
+        left: null,
+        right: null,
+    };
+
+    for (let i = 0; i < 2; i++) {
+        const raySpace = renderer.xr.getController(i);
+        const gripSpace = renderer.xr.getControllerGrip(i);
+        const mesh = controllerModelFactory.createControllerModel(gripSpace);
+
+        gripSpace.add(mesh);
+
+        gripSpace.addEventListener('connected', (e) => {
+
+            raySpace.visible = true;
+            gripSpace.visible = true;
+            const handedness = e.data.handedness;
+            controllers[handedness] = {
+                gamepad: new GamepadWrapper(e.data.gamepad),
+                raySpace,
+                gripSpace,
+                mesh,
+            };
+        });
+
+        gripSpace.addEventListener('disconnected', (e) => {
+            raySpace.visible = false;
+            gripSpace.visible = false;
+            const handedness = e.data.handedness;
+            controllers[handedness] = null;
+        });
+
+        player.add(raySpace, gripSpace);
+        // raySpace.visible = false;
+        // gripSpace.visible = false;
     }
 
     // Setup Clipping planes
@@ -284,6 +332,8 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
     setLayer(portalMesh, mapLayers.get("portal"));
     scene.add(portalMesh);
 
+    player.add(camera);
+
     function animate() {
         // requestAnimationFrame(animate);
 
@@ -385,12 +435,11 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
         renderer.render(scene, camera);
     }
 
-    function resize() {
-        const width = previewWindow.width;
-        const height = window.innerHeight;
+    function resize(width, height) {
 
         resolution.set(width, height);
 
+        resizePortal(width, height);
         resizeRenderer(width, height);
         resizeCamera(width, height);
     }
@@ -417,8 +466,101 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
     window.addEventListener("keydown", handleKeyDown);
     window.addEventListener("keyup", handleKeyUp);
 
+    function startXR() {
+        const sessionInit = {
+            optionalFeatures: [
+                "local-floor",
+                "bounded-floor",
+                "hand-tracking",
+                "layers"
+            ],
+            requiredFeatures: [
+                // "webgpu"
+            ]
+        };
+
+        navigator.xr
+            .requestSession("immersive-ar", sessionInit)
+            .then(onSessionStarted);
+
+        const vrDisplays = [];
+
+        if (navigator.getVRDisplays) {
+            function updateDisplay() {
+                // Call `navigator.getVRDisplays` (before Firefox 59).
+                navigator.getVRDisplays().then(displays => {
+                    console.log("Checking VR display");
+                    if (!displays.length) {
+                        throw new Error('No VR display found');
+                    } else {
+                        for (const display of displays) {
+                            console.log("Found VR Display:", display);
+                            vrDisplays.push(display);
+//                             document.body.innerHTML += `<br />
+// <span style="color: greenyellow">VR Display Connected!</span> <br />
+// <span style="color: greenyellow">Reload page to reset XR scene.</span>
+// `;
+                        }
+                    }
+                });
+            }
+
+            // As of Firefox 59, it's preferred to also wait for the `vrdisplayconnect` event to fire.
+            window.addEventListener('vrdisplayconnect', updateDisplay);
+            window.addEventListener('vrdisplaydisconnect', e => console.log.bind(console));
+            window.addEventListener('vrdisplayactivate', e => console.log.bind(console));
+            window.addEventListener('vrdisplaydeactivate', e => console.log.bind(console));
+            window.addEventListener('vrdisplayblur', e => console.log.bind(console));
+            window.addEventListener('vrdisplayfocus', e => console.log.bind(console));
+            window.addEventListener('vrdisplaypointerrestricted', e => console.log.bind(console));
+            window.addEventListener('vrdisplaypointerunrestricted', e => console.log.bind(console));
+            window.addEventListener('vrdisplaypresentchange', e => console.log.bind(console))
+        }
+    }
+
+    async function onSessionStarted(session) {
+        session.addEventListener("end", onSessionEnded);
+        await renderer.xr.setSession(session);
+        currentSession = session;
+    }
+
+    function onSessionEnded() {
+        currentSession.removeEventListener("end", onSessionEnded);
+        currentSession = null;
+    }
+
+    const xr_button = // VRButton.createButton(renderer);
+        document.createElement("button");
+    // xr_button.className = "vr-button";
+    xr_button.className = "xr-button";
+    xr_button.innerHTML = "Enter XR";
+    xr_button.addEventListener('click', async () => {
+
+        console.log("XR Button clicked");
+
+        startXR();
+
+        // Set camera position
+        camera.position.y = 0;
+
+        player.position.z = camera.position.z;
+        player.position.y = camera.position.y;
+
+        previewWindow.width = window.innerWidth;
+        previewWindow.height = window.innerHeight;
+
+        resize(previewWindow.width, previewWindow.height);
+        renderPortal();
+        renderWorld();
+
+        // container.style = `display: inline-block; color: #FFF; font-size: 24px; text-align: center; background-color: #000; height: 100vh; min-width: ${previewWindow.width / 2}px; max-width: ${previewWindow.width}px; max-height: ${previewWindow.height}px; overflow: hidden;`;
+        // container.innerHTML = "Reload page";
+    });
+
+    document.body.appendChild(xr_button);
+
     animate();
-    resize();
+    resize(previewWindow.width, previewWindow.height);
 }
 
 initScene(setupScene)
