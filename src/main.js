@@ -131,7 +131,7 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
     const statsMesh = new HTMLMesh( stats.dom );
     statsMesh.position.x = -1;
     statsMesh.position.y = 1;
-    statsMesh.position.z = 0.1;
+    statsMesh.position.z = -0.1;
     statsMesh.rotation.y = Math.PI / 4;
     statsMesh.scale.setScalar( 2 );
 
@@ -463,26 +463,35 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
             .add(worldDirection.multiplyScalar(0.01));
     }
 
+    function getDirectionalEndPoint (A, D) {
+        const B = new THREE.Vector3();
+        const distance = 100; // at what distance to determine pointB
+        D.normalize();
+        B.addVectors (A, D.multiplyScalar( distance ) );
+        return B;
+    }
+
+    // Draw a line from pointA in the given direction at distance 100
+    // From https://stackoverflow.com/questions/38205340/draw-line-in-direction-of-raycaster-in-three-js#answer-42498256
+    const pointA = new THREE.Vector3( 0, 1.0, -0.0 );
+    const pointB = getDirectionalEndPoint(pointA, new THREE.Vector3( 0.0, -1.0, -1.0 )); // <= , direction
+
+    // Create points on a line
+    const points = [];
+    points.push(pointA);
+    points.push(pointB);
+
+    const lineGeometry = new THREE.BufferGeometry();
+
+    lineGeometry.setFromPoints(points);
+
+    const geometry = lineGeometry;
+    const material = new THREE.LineBasicMaterial( { color : 0xff0000 } );
+    const line = new THREE.Line( geometry, material );
+    setLayer(line, mapLayers.get("outside"));
+    scene.add( line );
+
     function renderPortal() {
-        portalRenderer.clippingPlanes = (isInsidePortal) ? [
-            globalPlaneInside
-        ] : [
-            globalPlaneOutside
-        ];
-
-        renderer.clippingPlanes = (isInsidePortal) ? [
-            globalPlaneInside,
-            globalPlaneBottom
-        ] : [
-            globalPlaneOutside,
-            globalPlaneBottom
-        ];
-
-        torusMesh.material.clippingPlanes = isInsidePortal ? [
-            globalPlaneInside
-        ] : [
-            globalPlaneOutside
-        ];
 
         camera.layers.disable(mapLayers.get("portal"));
         // if (isInsidePortal) {
@@ -493,25 +502,71 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
             camera.layers.enable(mapLayers.get("inside"));
         // }
 
+        torusMesh.material.clippingPlanes = isInsidePortal ? [
+            globalPlaneInside
+        ] : [
+            globalPlaneOutside
+        ];
+
+        portalRenderer.clippingPlanes = (isInsidePortal) ? [
+            globalPlaneInside
+        ] : [
+            globalPlaneOutside
+        ];
+
         portalRenderer.render(scene, camera);
-        renderer.render(scene, camera);
+        // renderer.render(scene, camera);
     }
 
     function renderWorld() {
-        portalRenderer.clippingPlanes = [];
 
-        torusMesh.material.clippingPlanes = null;
+        // camera.layers.enable(mapLayers.get("portal"));
+        // if (isInsidePortal) {
+        //     camera.layers.disable(mapLayers.get("outside"));
+            camera.layers.enable(mapLayers.get("inside"));
+        // } else {
+        //     camera.layers.disable(mapLayers.get("inside"));
+            camera.layers.enable(mapLayers.get("outside"));
+        // }
+
+        // xrCameraDirection From:
+        // https://stackoverflow.com/questions/59554505/how-can-i-get-camera-world-direction-with-webxr#answer-59687055
+        let xrCamera = renderer.xr.getCamera(camera);
+        let xrCameraMatrix = xrCamera.matrixWorld;
+        // let xrCameraX = xrCameraMatrix.elements[3],
+        //     xrCameraY = xrCameraMatrix.elements[4],
+        //     xrCameraZ = xrCameraMatrix.elements[5];
+        let xrCameraA = new THREE.Vector3();
+        xrCameraA.setFromMatrixPosition(xrCameraMatrix);
+        // Reposition xr camera origin slightly down and in front of actual viewpoint
+        xrCameraA.y += -0.1;
+        xrCameraA.z += -0.1;
+        let xrCameraDX = xrCameraMatrix.elements[8],
+            xrCameraDY = xrCameraMatrix.elements[9],
+            xrCameraDZ = xrCameraMatrix.elements[10];
+        let xrCameraDirection = new THREE.Vector3(-xrCameraDX, -xrCameraDY, -xrCameraDZ).normalize();
+
+        // console.log(xrCameraA);
+
+        // Create points on a line
+        points[0] = xrCameraA; // new THREE.Vector3( 0, 1.0, -0.0 );
+        points[1] = getDirectionalEndPoint(points[0], xrCameraDirection);
+        lineGeometry.setFromPoints(points)
+
+        line.geometry = lineGeometry;
+        line.material.clippingPlanes = null;
 
         portalMesh.material.side = isInsidePortal ? THREE.BackSide : THREE.FrontSide;
 
-        camera.layers.enable(mapLayers.get("portal"));
-        // if (isInsidePortal) {
-            camera.layers.disable(mapLayers.get("outside"));
-            // camera.layers.enable(mapLayers.get("inside"));
-        // } else {
-            camera.layers.disable(mapLayers.get("inside"));
-        //     camera.layers.enable(mapLayers.get("outside"));
-        // }
+        torusMesh.material.clippingPlanes = null;
+
+        // renderer.clippingPlanes = (isInsidePortal) ? [
+        //     globalPlaneInside,
+        //     globalPlaneBottom
+        // ] : [
+        //     globalPlaneOutside,
+        //     globalPlaneBottom
+        // ];
 
         renderer.render(scene, camera);
     }
@@ -527,7 +582,7 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
         updateCameraTarget();
 
         renderPortal();
-        // renderWorld();
+        renderWorld();
 
         stats.end();
 
