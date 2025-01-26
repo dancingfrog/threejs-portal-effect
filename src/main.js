@@ -133,15 +133,30 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
 
     const resolution = new THREE.Vector2();
 
+    // Console div
+    const data_pad = document.createElement("div");
+    data_pad.id = "data-pad";
+    data_pad.style = "max-width: 100px; min-width: 100px; min-height: 320px; color: white; background-color: black;";
+    data_pad.innerHTML = "More stats... <br />";
+    const data_pad_data = document.createElement("p");
+    data_pad_data.id = "data-pad-data";
+    data_pad_data.innerHTML = ""
+    data_pad.append(data_pad_data);
+
     // Setup Stats
     const stats = new Stats();
     stats.showPanel(0);
+    stats.dom.append(data_pad);
+    // stats.dom.style += "max-width: 320px; background-color: black;";
+    stats.dom.style.maxWidth = "100px";
+    stats.dom.style.minWidth = "100px";
+    stats.dom.style.backgroundColor = "black";
     document.body.appendChild(stats.dom);
 
     const statsMesh = new HTMLMesh( stats.dom );
-    statsMesh.position.x = -1;
-    statsMesh.position.y = 1;
-    statsMesh.position.z = -0.1;
+    statsMesh.position.x = -0.75;
+    statsMesh.position.y = 1.25;
+    statsMesh.position.z = -0.5;
     statsMesh.rotation.y = Math.PI / 4;
     statsMesh.scale.setScalar( 2 );
 
@@ -377,9 +392,9 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
         torusMesh.rotation.y += 0.01;
     }
 
-    const groundInsideMesh = createGround(4, 0, mapColors.get("orangeLight"), null);
-    setLayer(groundInsideMesh, mapLayers.get("inside"));
-    scene.add(groundInsideMesh);
+    // const groundInsideMesh = createGround(4, 0, mapColors.get("orangeLight"), null);
+    // setLayer(groundInsideMesh, mapLayers.get("inside"));
+    // scene.add(groundInsideMesh);
 
     const shelfInsideMesh = createGround(4, 1, mapColors.get("green"), texture);
     setLayer(shelfInsideMesh, mapLayers.get("inside"));
@@ -501,7 +516,7 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
             camera.layers.enable(mapLayers.get("inside"));
         // }
 
-        torusMesh.material.clippingPlanes = isInsidePortal ? [
+        torusMesh.material.clippingPlanes = (isInsidePortal) ? [
             clippingPlaneInside
         ] : [
             clippingPlaneOutside
@@ -518,6 +533,8 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
     }
 
     function renderWorld() {
+
+        portalRenderer.clippingPlanes = [];
 
         // camera.layers.enable(mapLayers.get("portal"));
         // if (isInsidePortal) {
@@ -537,9 +554,9 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
         //     xrCameraZ = xrCameraMatrix.elements[5];
         let xrCameraA = new THREE.Vector3();
         xrCameraA.setFromMatrixPosition(xrCameraMatrix);
-        // Reposition xr camera origin slightly down and in front of actual viewpoint
-        xrCameraA.y += -0.1;
-        xrCameraA.z += -0.1;
+        // // Reposition xr camera origin slightly down and in front of actual viewpoint
+        // xrCameraA.y += -0.1;
+        // xrCameraA.z += -0.1;
         let xrCameraDX = xrCameraMatrix.elements[8],
             xrCameraDY = xrCameraMatrix.elements[9],
             xrCameraDZ = xrCameraMatrix.elements[10];
@@ -553,33 +570,63 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
         const viewingPlaneBottom = 1; // y bottom
         const viewingPlaneDepth = 0; // z
 
-        const clippingBottomDirection = new THREE.Vector3(0, 1, 0);
         const clippingBottomP = new THREE.Vector3(xrCameraA.x, viewingPlaneBottom, viewingPlaneDepth);
-        const clippingBottomY = 0.001 - viewingPlaneBottom;
-        const clippingBottomPlane = new THREE.Plane(clippingBottomDirection, clippingBottomY);
+        //
 
-        let vDBottom = new THREE.Vector3();
+        const vDBottom = new THREE.Vector3();
         vDBottom.subVectors(clippingBottomP, xrCameraA);
 
-        // Create points on a line
+        const clippingBottomUnitVector = (xrCameraA.z > 0) ?
+            new THREE.Vector3(0, 1.0, 0) :
+            new THREE.Vector3(0, -1.0, 0);
+        const clippingBottomDirection = vDBottom.clone().cross(new THREE.Vector3(-1, 0, 0)).normalize(); // new THREE.Vector3(0, 1, 0);
+        const clippingBottomUnitAngleToDirection = clippingBottomUnitVector.angleTo(clippingBottomDirection.clone());
+        const clippingBottomY = Math.cos(clippingBottomUnitAngleToDirection) * viewingPlaneBottom; // viewingPlaneBottom = 1.0 // length on unit circle
+
+        // console.log("clippingBottomAngleTo:", clippingBottomUnitAngleToDirection);
+        // console.log("clippingBottomY:", clippingBottomY);
+
+        // // Create points on a line
         points[0] = clippingBottomP; // xrCameraA; // new THREE.Vector3( 0, 1.0, -0.0 );
-        points[1] = getDirectionalEndPoint(points[0], vDBottom); // xrCameraDirection);
-        lineGeometry.setFromPoints(points)
+        points[1] = getDirectionalEndPoint(points[0], clippingBottomDirection.clone()); // xrCameraDirection.clone());
+        lineGeometry.setFromPoints(points);
+
+        // const clippingBottomPlane = new THREE.Plane(clippingBottomUnitVector.clone(), -0.999);
+        const clippingBottomPlane = new THREE.Plane(clippingBottomDirection.clone(), -0.999 * clippingBottomY);
 
         line.geometry = lineGeometry;
         line.material.clippingPlanes = null;
 
         portalMesh.material.side = isInsidePortal ? THREE.BackSide : THREE.FrontSide;
 
-        torusMesh.material.clippingPlanes = null;
-
-        // renderer.clippingPlanes = (isInsidePortal) ? [
-        //     clippingPlaneInside,
-        //     clippingBottomPlane
-        // ] : [
-        //     clippingPlaneOutside,
-        //     clippingBottomPlane
+        // skyInsideMesh.material.clippingPlanes = [
+        //     new THREE.Plane(clippingBottomUnitVector.clone(), -0.999)
         // ];
+
+        // torusMesh.material.clippingPlanes = [
+        //     new THREE.Plane(clippingBottomUnitVector.clone(), -0.999)
+        // ];
+
+        const new_data = JSON.stringify({
+            "angle": clippingBottomUnitAngleToDirection,
+            "bottom": clippingBottomY
+        })
+            .replace(new RegExp("\\\\n", "g"), '<br />')
+            .replace(new RegExp('"\:', "g"), '":<br />')
+            .replace(new RegExp(',', "g"), '",<br />')
+            .replace(new RegExp("{", "g"), '{<br />')
+            .replace(new RegExp("}", "g"), '<br />}');
+
+        data_pad_data.innerHTML = new_data;
+
+        renderer.clippingPlanes = (xrCameraA.z > 0) ? [
+            clippingPlaneOutside,
+            clippingBottomPlane
+        ] : [
+            clippingPlaneInside,
+            clippingPlaneOutside,
+            clippingBottomPlane
+        ];
 
         renderer.render(scene, camera);
     }
