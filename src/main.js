@@ -396,7 +396,7 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
     // setLayer(groundInsideMesh, mapLayers.get("inside"));
     // scene.add(groundInsideMesh);
 
-    const shelfInsideMesh = createGround(4, 1, mapColors.get("green"), texture);
+    const shelfInsideMesh = createGround(10, 1, mapColors.get("green"), texture);
     setLayer(shelfInsideMesh, mapLayers.get("inside"));
     scene.add(shelfInsideMesh);
 
@@ -554,9 +554,6 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
         //     xrCameraZ = xrCameraMatrix.elements[5];
         let xrCameraA = new THREE.Vector3();
         xrCameraA.setFromMatrixPosition(xrCameraMatrix);
-        // // Reposition xr camera origin slightly down and in front of actual viewpoint
-        // xrCameraA.y += -0.1;
-        // xrCameraA.z += -0.1;
         let xrCameraDX = xrCameraMatrix.elements[8],
             xrCameraDY = xrCameraMatrix.elements[9],
             xrCameraDZ = xrCameraMatrix.elements[10];
@@ -570,13 +567,19 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
         const viewingPlaneBottom = 1; // y bottom
         const viewingPlaneDepth = 0; // z
 
+        const clippingTopP = new THREE.Vector3(xrCameraA.x, viewingPlaneTop, viewingPlaneDepth);
         const clippingBottomP = new THREE.Vector3(xrCameraA.x, viewingPlaneBottom, viewingPlaneDepth);
-        //
 
+        const vDTop = new THREE.Vector3();
+        vDTop.subVectors(clippingTopP, xrCameraA);
         const vDBottom = new THREE.Vector3();
         vDBottom.subVectors(clippingBottomP, xrCameraA);
 
-        const clippingBottomUnitVector = (xrCameraA.z > 0) ?
+        const clippingTopUnitVector = new THREE.Vector3(0, -1.0, 0);
+        const clippingTopDirection = vDTop.clone().cross(new THREE.Vector3(1, 0, 0)).normalize();
+        const clippingTopUnitAngleToDirection = clippingTopUnitVector.angleTo(clippingTopDirection.clone());
+        const clippingTopY = Math.cos(clippingTopUnitAngleToDirection) * viewingPlaneTop;
+        const clippingBottomUnitVector = (xrCameraA.z > viewingPlaneDepth) ?
             new THREE.Vector3(0, 1.0, 0) :
             new THREE.Vector3(0, -1.0, 0);
         const clippingBottomDirection = vDBottom.clone().cross(new THREE.Vector3(-1, 0, 0)).normalize(); // new THREE.Vector3(0, 1, 0);
@@ -587,12 +590,14 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
         // console.log("clippingBottomY:", clippingBottomY);
 
         // // Create points on a line
-        points[0] = clippingBottomP; // xrCameraA; // new THREE.Vector3( 0, 1.0, -0.0 );
-        points[1] = getDirectionalEndPoint(points[0], clippingBottomDirection.clone()); // xrCameraDirection.clone());
+        points[0] = new THREE.Vector3( 0, clippingTopP.y, 0 ); // xrCameraA; // new THREE.Vector3( 0, 1.0, 0.0 );
+        points[1] = getDirectionalEndPoint(points[0], clippingTopDirection.clone()); // clippingBottomDirection.clone()); // xrCameraDirection.clone());
         lineGeometry.setFromPoints(points);
 
-        // const clippingBottomPlane = new THREE.Plane(clippingBottomUnitVector.clone(), -0.999);
-        const clippingBottomPlane = new THREE.Plane(clippingBottomDirection.clone(), -0.999 * clippingBottomY);
+        // const clippingBottomPlane = new THREE.Plane(clippingBottomUnitVector.clone(), -(viewingPlaneBottom - 0.001));
+        const clippingBottomPlane = new THREE.Plane(clippingBottomDirection.clone(), -(viewingPlaneBottom - 0.001) * clippingBottomY);
+        // const clippingTopPlane = new THREE.Plane(clippingTopUnitVector.clone(), 2.0);
+        const clippingTopPlane = new THREE.Plane(clippingTopDirection.clone(), viewingPlaneTop * clippingTopY);
 
         line.geometry = lineGeometry;
         line.material.clippingPlanes = null;
@@ -608,8 +613,10 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
         // ];
 
         const new_data = JSON.stringify({
-            "angle": clippingBottomUnitAngleToDirection,
-            "bottom": clippingBottomY
+            "topΘ": clippingTopUnitAngleToDirection,
+            "topY": clippingTopY,
+            "bottomΘ": clippingBottomUnitAngleToDirection,
+            "bottomY": clippingBottomY
         })
             .replace(new RegExp("\\\\n", "g"), '<br />')
             .replace(new RegExp('"\:', "g"), '":<br />')
@@ -619,12 +626,14 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
 
         data_pad_data.innerHTML = new_data;
 
-        renderer.clippingPlanes = (xrCameraA.z > 0) ? [
+        renderer.clippingPlanes = (xrCameraA.z > viewingPlaneDepth) ? [
             clippingPlaneOutside,
+            clippingTopPlane,
             clippingBottomPlane
         ] : [
             clippingPlaneInside,
             clippingPlaneOutside,
+            clippingTopPlane,
             clippingBottomPlane
         ];
 
