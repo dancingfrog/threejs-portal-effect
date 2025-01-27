@@ -54,7 +54,48 @@ let currentSession;
 let isInsidePortal = false;
 let wasOutside = true;
 
+function initListener (anchorObject) {
+    const listener = new THREE.AudioListener();
+
+    anchorObject.add(listener);
+
+    anchorObject['listener'] = listener;
+
+    window.listenerAnchor = anchorObject;
+
+    return listener;
+}
+
+function initSoundAnalyzer (anchorObject, initSoundPath) {
+
+    return new Promise((resolve, reject) => {
+
+        const sound = new THREE.PositionalAudio(anchorObject.listener); // THREE.Audio(listener) ... for basic playback
+        const loader = new THREE.AudioLoader();
+
+        loader.load(initSoundPath, (buffer) => {
+            sound.setBuffer(buffer);
+            sound.setRefDistance(1);
+            sound.setVolume(1);
+            // sound.play();
+
+            anchorObject['sound'] = sound;
+
+            const analyzer = new THREE.AudioAnalyser(sound, 32);
+
+            setTimeout(
+                resolve,
+                1500,
+                analyzer
+            );
+        });
+    });
+}
+
 async function initScene (setup = (scene, camera, controllers, players) => {}) {
+
+    const clock = new THREE.Clock();
+    let step_t = null;
 
     // iwer setup
     let nativeWebXRSupport = false;
@@ -231,7 +272,6 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
     scene.add(hemisphereLight);
 
     // Setup World
-
     const textureCanvas = document.createElement('canvas');
     const textureCanvasCtx = textureCanvas.getContext('2d');
     const texture = new THREE.CanvasTexture(textureCanvas);
@@ -438,6 +478,11 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
 
     player.add(camera);
 
+    // Initialize sound and play song with sound analyzer
+    const soundListener = initListener(torusMesh);
+    const soundAnalyzer = await initSoundAnalyzer(torusMesh, "assets/audio/Dream Song.mp3");
+    const soundData = [];
+
     const speed = 0.05;
     const directionVector = new THREE.Vector3();
     function up() {
@@ -640,9 +685,37 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
         renderer.render(scene, camera);
     }
 
-    function animate() {
+    function animate(t) {
+
+        const delta = clock.getDelta();
+        const timeElapsed = clock.getElapsedTime();
+
+        if (step_t === null) {
+            step_t = t
+        } else {
+            step_t = t - step_t;
+        }
+
+        // console.log("step_t:", step_t);
 
         stats.begin();
+
+        if (!!soundAnalyzer
+            && soundAnalyzer.hasOwnProperty("analyser")
+            && typeof soundAnalyzer.getFrequencyData === "function"
+        ) {
+
+            if (torusMesh.hasOwnProperty("sound") && !!torusMesh['sound'].isPlaying) {
+
+                // sound analysis
+                soundData.push([...soundAnalyzer.getFrequencyData()]);
+
+                console.log("Last soundData:", soundData[(soundData.length - 1)]);
+            }
+
+        } else {
+            console.log("soundAnalyzer is not ready:", soundAnalyzer);
+        }
 
         // testPortalBounds();
 
@@ -744,8 +817,13 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
 
     async function onSessionStarted(session) {
         session.addEventListener("end", onSessionEnded);
-        await renderer.xr.setSession(session);
-        currentSession = session;
+        renderer.xr.setSession(session)
+            .then(() => {
+                currentSession = session;
+            });
+        if (torusMesh.hasOwnProperty("sound")) {
+            torusMesh['sound'].play();
+        }
     }
 
     function onSessionEnded() {
