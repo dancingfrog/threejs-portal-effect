@@ -82,16 +82,14 @@ float F_Schlick( const in float f0, const in float f90, const in float dotVH ) {
     return f0 * ( 1.0 - fresnel ) + ( f90 * fresnel );
 } // validated
 
-
 #include <batching_pars_vertex>
 #include <uv_pars_vertex>
-#include <displacementmap_pars_vertex>
+#include <envmap_pars_vertex>
 #include <color_pars_vertex>
 #include <fog_pars_vertex>
 #include <normal_pars_vertex>
 #include <morphtarget_pars_vertex>
 #include <skinning_pars_vertex>
-#include <shadowmap_pars_vertex>
 #include <logdepthbuf_pars_vertex>
 #include <clipping_planes_pars_vertex>
 

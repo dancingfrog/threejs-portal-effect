@@ -1,13 +1,17 @@
-#define STANDARD
-#ifdef PHYSICAL
-    #define IOR
-    #define USE_SPECULAR
-#endif
 uniform vec3 diffuse;
 uniform vec3 emissive;
 uniform float roughness;
 uniform float metalness;
 uniform float opacity;
+#ifndef FLAT_SHADED
+    varying vec3 vNormal;
+#endif
+
+#define STANDARD
+#ifdef PHYSICAL
+    #define IOR
+    #define USE_SPECULAR
+#endif
 #ifdef IOR
     uniform float ior;
 #endif
@@ -139,23 +143,10 @@ float F_Schlick( const in float f0, const in float f90, const in float dotVH ) {
 #include <alphahash_pars_fragment>
 #include <aomap_pars_fragment>
 #include <lightmap_pars_fragment>
-#include <emissivemap_pars_fragment>
-#include <iridescence_fragment>
-#include <cube_uv_reflection_fragment>
 #include <envmap_common_pars_fragment>
-#include <envmap_physical_pars_fragment>
+#include <envmap_pars_fragment>
 #include <fog_pars_fragment>
-#include <lights_pars_begin>
-#include <normal_pars_fragment>
-#include <lights_physical_pars_fragment>
-#include <transmission_pars_fragment>
-#include <shadowmap_pars_fragment>
-#include <bumpmap_pars_fragment>
-#include <normalmap_pars_fragment>
-#include <clearcoat_pars_fragment>
-#include <iridescence_pars_fragment>
-#include <roughnessmap_pars_fragment>
-#include <metalnessmap_pars_fragment>
+#include <specularmap_pars_fragment>
 #include <logdepthbuf_pars_fragment>
 #include <clipping_planes_pars_fragment>
 
@@ -232,43 +223,53 @@ float cnoise(vec3 P){
 }
 
 varying vec3 vPos;
-uniform float skyRadius;
-uniform vec3 noiseOffset;
-
-uniform vec3 env_c1;
-uniform vec3 env_c2;
-
-uniform float clusterSize;
-uniform float clusterStrength;
-
-uniform float starSize;
-uniform float starDensity;
 
 void main() {
     vec4 diffuseColor = vec4( diffuse, opacity );
     #include <clipping_planes_fragment>
-    ReflectedLight reflectedLight = ReflectedLight( vec3( 0.0 ), vec3( 0.0 ), vec3( 0.0 ), vec3( 0.0 ) );
-    vec3 totalEmissiveRadiance = emissive;
     #include <logdepthbuf_fragment>
     #include <map_fragment>
     #include <color_fragment>
     #include <alphamap_fragment>
     #include <alphatest_fragment>
     #include <alphahash_fragment>
-    #include <roughnessmap_fragment>
-    #include <metalnessmap_fragment>
-    #include <normal_fragment_begin>
-    #include <normal_fragment_maps>
-    #include <clearcoat_normal_fragment_begin>
-    #include <clearcoat_normal_fragment_maps>
-    #include <emissivemap_fragment>
-    #include <lights_physical_fragment>
-    #include <lights_fragment_begin>
-    #include <lights_fragment_maps>
-    #include <lights_fragment_end>
+    #include <specularmap_fragment>
+    ReflectedLight reflectedLight = ReflectedLight( vec3( 0.0 ), vec3( 0.0 ), vec3( 0.0 ), vec3( 0.0 ) );
+    #ifdef USE_LIGHTMAP
+        vec4 lightMapTexel = texture2D( lightMap, vLightMapUv );
+        reflectedLight.indirectDiffuse += lightMapTexel.rgb * lightMapIntensity * RECIPROCAL_PI;
+    #else
+        reflectedLight.indirectDiffuse += vec3( 1.0 );
+    #endif
+    #include <aomap_fragment>
+    reflectedLight.indirectDiffuse *= diffuseColor.rgb;
+    vec3 outgoingLight = reflectedLight.indirectDiffuse;
+    #include <envmap_fragment>
+    #include <opaque_fragment>
+    #include <tonemapping_fragment>
+    #include <colorspace_fragment>
+    #include <fog_fragment>
+    #include <premultiplied_alpha_fragment>
+    #include <dithering_fragment>
 
     // gl_FragColor = vec4(1, 0, 0, 1);
-     gl_FragColor = vec4(vNormal * 0.25 + 0.75, 1);
+    // gl_FragColor = vec4(vNormal * 0.25 + 0.75, 1);
+    // gl_FragColor = vec4(gl_FragColor.rgb * 0.75 + 0.25, 1);
+
+    // Less texture...
+    gl_FragColor = gl_FragColor * 0.05;
+
+    float skyRadius = 5.01;
+    vec3 noiseOffset = vec3(100.01, 100.01, 100.01);
+
+    vec3 env_c1 = vec3(0.036, 0.051, 0.065);
+    vec3 env_c2 = vec3(0.065, 0.036, 0.051);
+
+    float clusterSize = 0.2;
+    float clusterStrength = 0.2;
+
+    float starSize = 0.01;
+    float starDensity = 0.09;
 
     float freq = 1.1/skyRadius;
     float noise = cnoise(vPos * freq);
@@ -278,12 +279,12 @@ void main() {
     // vec4 backgroundColor = vec4(mix(env_c1, env_c2, noise), 1.0);
     // vec4 backgroundColor = vec4(mix(env_c1, vec4(vNormal * 0.25 + 0.75, 1).rbg, noise), 1.0);
     vec4 backgroundColor = vec4(mix(
-    vec4(0.125 - mix(env_c1, vNormal * 0.25, noise), 1).rbg,
-    vec4(0.125 - mix(env_c2, vNormal * 0.25, noise), 1).rbg,
-    noise
+      vec4(0.125 - mix(env_c1, vNormal * 0.25, noise), 1).rbg,
+      vec4(0.125 - mix(env_c2, vNormal * 0.25, noise), 1).rbg,
+      noise
     ), 1.0);
 
-    gl_FragColor = backgroundColor;
+    gl_FragColor += backgroundColor;
 
     float scaledClusterSize = (1.0/clusterSize)/skyRadius;
     float scaledStarSize = (1.0/starSize)/skyRadius;

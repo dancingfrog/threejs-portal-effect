@@ -11,11 +11,17 @@ import Stats from "https://unpkg.com/three@0.118.3/examples/jsm/libs/stats.modul
 
 import setupScene from "./setup/setupScene";
 
-import wavesVertexShader from "./shaders/waves/vertexShader.glsl";
-import defaultFragmentShader from "./shaders/default/fragmentShader.glsl";
+// import wavesVertexShader from "./shaders/waves/vertexShader.glsl";
+// import defaultFragmentShader from "./shaders/default/fragmentShader.glsl";
 
-import starrySkyVertexShader from "./shaders/starry-sky/vertexShader.glsl";
-import starrySkyFragmentShader from "./shaders/starry-sky/fragmentShader.glsl";
+// import starrySkyVertexShader from "./shaders/starry-sky/vertexShader.glsl";
+// import starrySkyFragmentShader from "./shaders/starry-sky/fragmentShader.glsl";
+
+// import textureVertexShader from "./shaders/texture/vertexShader.glsl";
+// import textureFragmentShader from "./shaders/texture/fragmentShader.glsl";
+
+import starrySkyVertexShader from "./shaders/starry-sky-texture/vertexShader.glsl";
+import starrySkyFragmentShader from "./shaders/starry-sky-texture/fragmentShader.glsl";
 
 
 // Helper function to set nested meshes to layers
@@ -435,13 +441,44 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
                 transparent: true
             });
 
-        material.onBeforeCompile = (shader) => {
-            shader.uniforms.uResolution = new THREE.Uniform(resolution);
-            shader.uniforms.time = new THREE.Uniform(1.0); // <= DOES NOT WORK w/ MeshBasicMaterial
+        if (!!skyTexture && skyTexture !== null) {
+            material.onBeforeCompile = (shader) => {
+                shader.uniforms.time = new THREE.Uniform(1.0); // <= DOES NOT WORK w/ MeshBasicMaterial
+                shader.uniforms.uResolution = new THREE.Uniform(resolution);
 
-            shader.vertexShader = starrySkyVertexShader; // wavesVertexShader; //
-            shader.fragmentShader = starrySkyFragmentShader; // defaultFragmentShader; //
-        };
+                // shader.vertexShader = wavesVertexShader;
+                shader.vertexShader = starrySkyVertexShader;
+                // shader.vertexShader = textureVertexShader;
+
+                // console.log(shader.vertexShader);
+
+                // shader.fragmentShader = defaultFragmentShader;
+                shader.fragmentShader = starrySkyFragmentShader;
+                // shader.fragmentShader = textureFragmentShader;
+
+                shader.fragmentShader = `
+      uniform float time;
+      uniform vec2 uResolution;
+`
+                    + shader.fragmentShader;
+
+                //         shader.fragmentShader = shader.fragmentShader.replace(
+                //             "#include <map_fragment>",
+                //             `
+                //   vec2 pos = gl_FragCoord.xy/uResolution;
+                //   vec4 sampledDiffuseColor = texture2D( map, pos );
+                //   diffuseColor *= sampledDiffuseColor;
+                // `
+                //         );
+
+                // console.log(shader.fragmentShader);
+            };
+
+            material.onBeforeRender = (ctx) => {
+                // console.log(ctx.constructor,  ": ", ctx);
+            };
+        }
+
         return new THREE.Mesh(geometry, material);
     }
 
@@ -466,10 +503,10 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
         material.onBeforeCompile = (shader) => {
             shader.uniforms.uResolution = new THREE.Uniform(resolution);
 
-            shader.fragmentShader =
-                `
+            shader.fragmentShader = `
       uniform vec2 uResolution;
-    ` + shader.fragmentShader;
+`
+                + shader.fragmentShader;
 
             shader.fragmentShader = shader.fragmentShader.replace(
                 "#include <map_fragment>",
@@ -498,23 +535,6 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
                 color,
                 side: THREE.DoubleSide
             });
-    //     material.onBeforeCompile = (shader) => {
-    //         shader.uniforms.uResolution = new THREE.Uniform(resolution);
-    //
-    //         shader.fragmentShader =
-    //             `
-    //   uniform vec2 uResolution;
-    // ` + shader.fragmentShader;
-    //
-    //         shader.fragmentShader = shader.fragmentShader.replace(
-    //             "#include <map_fragment>",
-    //             `
-    //   vec2 pos = gl_FragCoord.xy/uResolution;
-    //   vec4 sampledDiffuseColor = texture2D( map, pos );
-    //   diffuseColor *= sampledDiffuseColor;
-    // `
-    //         );
-    //     };
 
         return new THREE.Mesh(geometry, material);
     }
@@ -548,7 +568,7 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
     setLayer(shelfInsideMesh, mapLayers.get("inside"));
     scene.add(shelfInsideMesh);
 
-    const skyInsideMesh = createSphere(5, mapColors.get("orangeDark")); //, texture);
+    const skyInsideMesh = createSphere(5, mapColors.get("orangeDark"), texture);
     setLayer(skyInsideMesh, mapLayers.get("inside"));
     scene.add(skyInsideMesh);
 
@@ -830,7 +850,11 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
 
         // testPortalBounds();
 
-        skyInsideMesh.material.uniforms.time.value = timeElapsed; // <= DOES NOT WORK w/ MeshBasicMaterial
+        uniforms.time["value"] = timeElapsed;
+
+        if (skyInsideMesh.material.hasOwnProperty("uniforms")) {
+            skyInsideMesh.material.uniforms.time.value = timeElapsed; // <= DOES NOT WORK w/ MeshBasicMaterial
+        }
 
         // updateScene(currentSession, delta, timeElapsed, (Object.keys(sceneDataUpdate).length > 0) ? sceneDataUpdate : null);
 
