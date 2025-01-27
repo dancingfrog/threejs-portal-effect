@@ -11,6 +11,12 @@ import Stats from "https://unpkg.com/three@0.118.3/examples/jsm/libs/stats.modul
 
 import setupScene from "./setup/setupScene";
 
+import wavesVertexShader from "./shaders/waves/vertexShader.glsl";
+import defaultFragmentShader from "./shaders/default/fragmentShader.glsl";
+
+import starrySkyVertexShader from "./shaders/starry-sky/vertexShader.glsl";
+import starrySkyFragmentShader from "./shaders/starry-sky/fragmentShader.glsl";
+
 
 // Helper function to set nested meshes to layers
 // https://github.com/mrdoob/three.js/issues/10959
@@ -168,6 +174,7 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
     // Setup Scene
     const scene = new THREE.Scene();
 
+    // Setup player
     const player = new THREE.Group();
 
     scene.add(player);
@@ -262,6 +269,11 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
         // raySpace.visible = false;
         // gripSpace.visible = false;
     }
+
+    player.add(camera);
+
+    // // Setup Scene
+    // const updateScene = await setup(renderer, scene, camera, controllers, player);
 
     // Setup Light
     const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
@@ -359,12 +371,77 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
         return groundMesh
     }
 
-    function createSphere (size, color) {
-        const geometry = new THREE.SphereGeometry(size, 32, 32);
-        const material = new THREE.MeshPhysicalMaterial({
-            color,
-            side: THREE.BackSide
-        });
+    const skyDomeRadius = 5.01;
+    const uniforms = {
+        ...THREE.ShaderLib.physical.uniforms,
+        // diffuse: { value: "#5B82A6" }, // <= DO NO USE WITH THREE.ShaderChunk.meshphysical_frag ...
+        diffuse: { value: { "r": 0.36, "g": 0.51, "b": 0.65 } },
+        roughness: { value: 0.5 },
+        amplitude: { value: 0.25},
+        frequency: { value: 0.5 },
+        speed: { value: 0.3 },
+        // fogDensity: { value: 0.45 },
+        // fogColor: { value: new THREE.Vector3( 0, 0, 0 ) },
+        // uvScale: { value: new THREE.Vector2( 3.0, 1.0 ) },
+        // texture1: { value: cloudTexture },
+        // texture2: { value: lavaTexture },
+        // env_c1: { value: { "r": 0.036, "g": 0.051, "b": 0.065 } },
+        // env_c2: { value: { "r": 0.065, "g": 0.036, "b": 0.051 } },
+        env_c1: { value: new THREE.Color("#0d1a2f") },
+        env_c2: { value: new THREE.Color("#0f8682") },
+        skyRadius: { value: skyDomeRadius },
+        noiseOffset: { value: new THREE.Vector3(100.01, 100.01, 100.01) },
+        starSize: { value: 0.01 },
+        starDensity: { value: 0.09 },
+        clusterStrength: { value: 0.2 },
+        clusterSize: { value: 0.2 },
+        time: { value: 1.0 }
+    };
+
+    function createSphere (size, color, skyTexture) {
+        const geometry = new THREE.SphereGeometry(size, 128, 32);
+        const material = (!!skyTexture && skyTexture !== null) ?
+            new THREE.MeshBasicMaterial({
+                uniforms: uniforms,
+                map: skyTexture,
+                doubleSided: true,
+                defines: {
+                    STANDARD: '',
+                    PHYSICAL: '',
+                },
+                extensions: {
+                    derivatives: true,
+                },
+                lights: true,
+                opacity: 1.0,
+                side: THREE.DoubleSide,
+                transparent: true
+            }) :
+            new THREE.ShaderMaterial({
+                uniforms: uniforms,
+                vertexShader: starrySkyVertexShader, // wavesVertexShader,
+                fragmentShader: starrySkyFragmentShader, // defaultFragmentShader,
+                doubleSided: true,
+                defines: {
+                    STANDARD: '',
+                    PHYSICAL: '',
+                },
+                extensions: {
+                    derivatives: true,
+                },
+                lights: true,
+                opacity: 1.0,
+                side: THREE.DoubleSide,
+                transparent: true
+            });
+
+        material.onBeforeCompile = (shader) => {
+            shader.uniforms.uResolution = new THREE.Uniform(resolution);
+            shader.uniforms.time = new THREE.Uniform(1.0); // <= DOES NOT WORK w/ MeshBasicMaterial
+
+            shader.vertexShader = starrySkyVertexShader; // wavesVertexShader; //
+            shader.fragmentShader = starrySkyFragmentShader; // defaultFragmentShader; //
+        };
         return new THREE.Mesh(geometry, material);
     }
 
@@ -471,7 +548,7 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
     setLayer(shelfInsideMesh, mapLayers.get("inside"));
     scene.add(shelfInsideMesh);
 
-    const skyInsideMesh = createSphere(2, mapColors.get("orangeDark"));
+    const skyInsideMesh = createSphere(5, mapColors.get("orangeDark")); //, texture);
     setLayer(skyInsideMesh, mapLayers.get("inside"));
     scene.add(skyInsideMesh);
 
@@ -507,12 +584,10 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
     torusMesh.position.set(0, 1, 0);
     scene.add(torusMesh);
 
-    player.add(camera);
-
-    // Initialize sound and play song with sound analyzer
-    const soundListener = initListener(torusMesh);
-    const soundAnalyzer = await initSoundAnalyzer(torusMesh, "assets/audio/Dream Song.mp3");
-    const soundData = [];
+    // // Initialize sound and play song with sound analyzer
+    // const soundListener = initListener(torusMesh);
+    // const soundAnalyzer = await initSoundAnalyzer(torusMesh, "assets/audio/Dream Song.mp3");
+    // const soundData = [];
 
     const speed = 0.05;
     const directionVector = new THREE.Vector3();
@@ -673,20 +748,23 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
         // const clippingBottomPlane = new THREE.Plane(clippingBottomUnitVector.clone(), -(viewingPlaneBottom - 0.001));
         const clippingBottomPlane = new THREE.Plane(clippingBottomDirection.clone(), -(viewingPlaneBottom - 0.001) * clippingBottomY);
         // const clippingTopPlane = new THREE.Plane(clippingTopUnitVector.clone(), 2.0);
-        const clippingTopPlane = new THREE.Plane(clippingTopDirection.clone(), viewingPlaneTop * clippingTopY);
+        const clippingTopPlane = new THREE.Plane(clippingTopDirection.clone(), clippingTopY);
 
         line.geometry = lineGeometry;
         line.material.clippingPlanes = null;
 
         portalMesh.material.side = isInsidePortal ? THREE.BackSide : THREE.FrontSide;
 
-        // skyInsideMesh.material.clippingPlanes = [
-        //     new THREE.Plane(clippingBottomUnitVector.clone(), -0.999)
-        // ];
+        skyInsideMesh.material.clippingPlanes = [
+            clippingPlaneOutside,
+            clippingTopPlane,
+            clippingBottomPlane,
+            new THREE.Plane(clippingBottomUnitVector.clone(), -0.999)
+        ];
 
-        // torusMesh.material.clippingPlanes = [
-        //     new THREE.Plane(clippingBottomUnitVector.clone(), -0.999)
-        // ];
+        torusMesh.material.clippingPlanes = [
+            new THREE.Plane(clippingBottomUnitVector.clone(), -0.999)
+        ];
 
         const new_data = JSON.stringify({
             "topΘ": clippingTopUnitAngleToDirection,
@@ -729,26 +807,32 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
 
         // console.log("step_t:", step_t);
 
+        const sceneDataUpdate = {};
+
         stats.begin();
 
-        if (!!soundAnalyzer
-            && soundAnalyzer.hasOwnProperty("analyser")
-            && typeof soundAnalyzer.getFrequencyData === "function"
-        ) {
-
-            if (torusMesh.hasOwnProperty("sound") && !!torusMesh['sound'].isPlaying) {
-
-                // sound analysis
-                soundData.push([...soundAnalyzer.getFrequencyData()]);
-
-                // console.log("Last soundData:", soundData[(soundData.length - 1)]);
-            }
-
-        } else {
-            console.log("soundAnalyzer is not ready:", soundAnalyzer);s
-        }
+        // if (!!soundAnalyzer
+        //     && soundAnalyzer.hasOwnProperty("analyser")
+        //     && typeof soundAnalyzer.getFrequencyData === "function"
+        // ) {
+        //
+        //     if (torusMesh.hasOwnProperty("sound") && !!torusMesh['sound'].isPlaying) {
+        //
+        //         // sound analysis
+        //         soundData.push([...soundAnalyzer.getFrequencyData()]);
+        //
+        //         // console.log("Last soundData:", soundData[(soundData.length - 1)]);
+        //     }
+        //
+        // } else {
+        //     console.log("soundAnalyzer is not ready:", soundAnalyzer);s
+        // }
 
         // testPortalBounds();
+
+        skyInsideMesh.material.uniforms.time.value = timeElapsed; // <= DOES NOT WORK w/ MeshBasicMaterial
+
+        // updateScene(currentSession, delta, timeElapsed, (Object.keys(sceneDataUpdate).length > 0) ? sceneDataUpdate : null);
 
         updateTorus();
         updateCameraPosition();
@@ -847,14 +931,15 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
     }
 
     async function onSessionStarted(session) {
-        session.addEventListener("end", onSessionEnded);
         renderer.xr.setSession(session)
             .then(() => {
                 currentSession = session;
+                currentSession.addEventListener("end", onSessionEnded);
             });
-        if (torusMesh.hasOwnProperty("sound")) {
-            torusMesh['sound'].play();
-        }
+
+        // if (torusMesh.hasOwnProperty("sound")) {
+        //     torusMesh['sound'].play();
+        // }
     }
 
     function onSessionEnded() {
