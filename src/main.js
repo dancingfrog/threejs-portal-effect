@@ -271,7 +271,7 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
     const hemisphereLight = new THREE.HemisphereLight(0xffffff, 0xffffff, 3);
     scene.add(hemisphereLight);
 
-    // Setup World
+    // Setup texture`
     const textureCanvas = document.createElement('canvas');
     const textureCanvasCtx = textureCanvas.getContext('2d');
     const texture = new THREE.CanvasTexture(textureCanvas);
@@ -340,7 +340,7 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
     }
 
     // generateFaceLabel(textureCanvasCtx, '#F00', '#0FF', '+X');
-    generateFaceGrid(textureCanvasCtx, '#F90', 10.0);
+    generateFaceGrid(textureCanvasCtx, '#09F', 10.0);
 
     function createGround(width, height, groundColor, groundTexture) {
         const geometry = new THREE.PlaneGeometry(width, width, 1, 1);
@@ -357,15 +357,6 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
         groundMesh.rotation.set(-Math.PI * 0.5, 0, 0);
         groundMesh.position.y = height;
         return groundMesh
-    }
-
-    function createTorus(color) {
-        const geometry = new THREE.TorusKnotGeometry(0.25, 0.03, 100, 16);
-        const material = new THREE.MeshPhysicalMaterial({
-            color,
-            side: THREE.DoubleSide
-        });
-        return new THREE.Mesh(geometry, material);
     }
 
     function createSphere (size, color) {
@@ -416,21 +407,61 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
         return new THREE.Mesh(geometry, material);
     }
 
-    const portalRadialBounds = 1.0; // relative to portal size
-    function testPortalBounds() {
-        const isOutside = camera.position.z > 0;
-        const distance = portalMesh.position.distanceTo(camera.position);
-        const withinPortalBounds = distance < portalRadialBounds;
-        if (wasOutside !== isOutside && withinPortalBounds) {
-            isInsidePortal = !isOutside;
-        }
-        wasOutside = isOutside;
+    function createTorus(color, torusTexture) {
+        const geometry = new THREE.TorusKnotGeometry(0.25, 0.03, 100, 16);
+        const material = (!!torusTexture && torusTexture !== null) ?
+            new THREE.MeshBasicMaterial({
+                map: torusTexture,
+                doubleSided: true,
+                opacity: 1.0,
+                side: THREE.DoubleSide,
+                transparent: true
+            }) :
+            new THREE.MeshPhysicalMaterial({
+                color,
+                side: THREE.DoubleSide
+            });
+    //     material.onBeforeCompile = (shader) => {
+    //         shader.uniforms.uResolution = new THREE.Uniform(resolution);
+    //
+    //         shader.fragmentShader =
+    //             `
+    //   uniform vec2 uResolution;
+    // ` + shader.fragmentShader;
+    //
+    //         shader.fragmentShader = shader.fragmentShader.replace(
+    //             "#include <map_fragment>",
+    //             `
+    //   vec2 pos = gl_FragCoord.xy/uResolution;
+    //   vec4 sampledDiffuseColor = texture2D( map, pos );
+    //   diffuseColor *= sampledDiffuseColor;
+    // `
+    //         );
+    //     };
+
+        return new THREE.Mesh(geometry, material);
     }
 
     function updateTorus() {
         torusMesh.rotation.x += 0.01;
         torusMesh.rotation.y += 0.01;
+
+        // for (let i = 0; i < 1000; i++) {
+        //     drawRandomDot(textureCanvasCtx);
+        //     texture.needsUpdate = true;
+        // }
     }
+
+    const portalRadialBounds = 1.0; // relative to portal size
+    // function testPortalBounds() {
+    //     const isOutside = camera.position.z > 0;
+    //     const distance = portalMesh.position.distanceTo(camera.position);
+    //     const withinPortalBounds = distance < portalRadialBounds;
+    //     if (wasOutside !== isOutside && withinPortalBounds) {
+    //         isInsidePortal = !isOutside;
+    //     }
+    //     wasOutside = isOutside;
+    // }
 
     // const groundInsideMesh = createGround(4, 0, mapColors.get("orangeLight"), null);
     // setLayer(groundInsideMesh, mapLayers.get("inside"));
@@ -472,7 +503,7 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
     setLayer(portalMesh, mapLayers.get("portal"));
     scene.add(portalMesh);
 
-    const torusMesh = createTorus(mapColors.get("grey"));
+    const torusMesh = createTorus(mapColors.get("grey"), texture);
     torusMesh.position.set(0, 1, 0);
     scene.add(torusMesh);
 
@@ -710,11 +741,11 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
                 // sound analysis
                 soundData.push([...soundAnalyzer.getFrequencyData()]);
 
-                console.log("Last soundData:", soundData[(soundData.length - 1)]);
+                // console.log("Last soundData:", soundData[(soundData.length - 1)]);
             }
 
         } else {
-            console.log("soundAnalyzer is not ready:", soundAnalyzer);
+            console.log("soundAnalyzer is not ready:", soundAnalyzer);s
         }
 
         // testPortalBounds();
