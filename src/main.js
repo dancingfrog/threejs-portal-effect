@@ -291,13 +291,7 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
 
     // Setup texture`
     const textureCanvas = document.createElement('canvas');
-    const textureCanvasCtx = textureCanvas.getContext('2d');
-    const texture = new THREE.CanvasTexture(textureCanvas);
-
-    textureCanvasCtx.canvas.width = textureCanvasCtx.canvas.height = window.innerWidth;
-
-    textureCanvasCtx.fillStyle = "transparent";
-    textureCanvasCtx.fillRect(0, 0, textureCanvasCtx.canvas.width, textureCanvasCtx.canvas.height);
+    const canvasTexture = new THREE.CanvasTexture(textureCanvas);
 
     function randInt(min, max) {
         if (max === undefined) {
@@ -307,7 +301,9 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
         return Math.random() * (max - min) + min | 0;
     }
 
-    function drawRandomDot(ctx) {
+    function drawRandomDot(texture) {
+        const ctx = texture.source.data.getContext('2d');
+
         ctx.strokeStyle = `#${randInt(0x1000000).toString(16).padStart(6, '0')}`;
         ctx.fillStyle = `#${randInt(0x1000000).toString(16).padStart(6, '0')}`;
         ctx.beginPath();
@@ -318,13 +314,21 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
         ctx.arc(x, y, radius, 0, Math.PI * 2);
         ctx.stroke();
         ctx.fill();
+
+        return ctx;
     }
 
     // for (let i = 0; i < 1000; i++) {
-    //     drawRandomDot(textureCanvasCtx);
+    //     drawRandomDot(canvasTexture);
     // }
 
-    function generateFaceLabel(ctx, faceColor, textColor, text) {
+    function generateFaceLabel(texture, faceColor, textColor, text) {
+        const ctx = texture.source.data.getContext('2d');
+
+        ctx.canvas.width = ctx.canvas.height = 100;
+
+        ctx.fillStyle = "transparent";
+        ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
         const {width, height} = ctx.canvas;
         ctx.fillStyle = faceColor;
         ctx.fillRect(0, 0, width, height);
@@ -333,12 +337,30 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
         ctx.textBaseline = 'middle';
         ctx.fillStyle = textColor;
         ctx.fillText(text, width / 2, height / 2);
+
+        return ctx;
     }
 
-    function generateFaceGrid(ctx, gridColor, gridSpacingPixels) {
-        ctx.strokeStyle = gridColor;
+    function generateFaceGrid(texture, gridColor, gridSpacingPixels) {
+
+        const textureRepeatScale = gridSpacingPixels * gridSpacingPixels;
+        texture.repeat.set(textureRepeatScale, textureRepeatScale);
+        texture.repeat.x = textureRepeatScale;
+        texture.repeat.y = textureRepeatScale;
+        texture.wrapS = texture.wrapT = THREE.RepeatWrapping
+        texture.colorSpace = THREE.SRGBColorSpace;
+
+        const ctx = texture.source.data.getContext('2d');
+
+        ctx.canvas.width = ctx.canvas.height = textureRepeatScale;
+
         const w = ctx.canvas.width,
             h = ctx.canvas.height;
+
+        ctx.fillStyle = "transparent";
+        ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+
+        ctx.strokeStyle = gridColor;
         ctx.beginPath();
         for (let x=gridSpacingPixels/2; x<=w; x+=gridSpacingPixels){
             ctx.save();
@@ -355,10 +377,9 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
             ctx.restore();
         }
         ctx.stroke();
-    }
 
-    // generateFaceLabel(textureCanvasCtx, '#F00', '#0FF', '+X');
-    generateFaceGrid(textureCanvasCtx, '#09F', 10.0);
+        return ctx;
+    }
 
     function createGround(width, height, groundColor, groundTexture) {
         const geometry = new THREE.PlaneGeometry(width, width, 1, 1);
@@ -446,30 +467,17 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
                 shader.uniforms.time = new THREE.Uniform(1.0); // <= DOES NOT WORK w/ MeshBasicMaterial
                 shader.uniforms.uResolution = new THREE.Uniform(resolution);
 
-                // shader.vertexShader = wavesVertexShader;
                 shader.vertexShader = starrySkyVertexShader;
-                // shader.vertexShader = textureVertexShader;
 
                 // console.log(shader.vertexShader);
 
-                // shader.fragmentShader = defaultFragmentShader;
                 shader.fragmentShader = starrySkyFragmentShader;
-                // shader.fragmentShader = textureFragmentShader;
 
                 shader.fragmentShader = `
       uniform float time;
       uniform vec2 uResolution;
 `
                     + shader.fragmentShader;
-
-                //         shader.fragmentShader = shader.fragmentShader.replace(
-                //             "#include <map_fragment>",
-                //             `
-                //   vec2 pos = gl_FragCoord.xy/uResolution;
-                //   vec4 sampledDiffuseColor = texture2D( map, pos );
-                //   diffuseColor *= sampledDiffuseColor;
-                // `
-                //         );
 
                 // console.log(shader.fragmentShader);
             };
@@ -480,17 +488,6 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
         }
 
         return new THREE.Mesh(geometry, material);
-    }
-
-    function createBox(width, height, depth, color) {
-        const geometry = new THREE.BoxGeometry(width, height, depth);
-        const material = new THREE.MeshPhysicalMaterial({ color });
-        const mesh = new THREE.Mesh(geometry, material);
-        mesh.position.y += height * 0.5;
-
-        const wrapper = new THREE.Object3D();
-        wrapper.add(mesh);
-        return wrapper;
     }
 
     function createPortal(size) {
@@ -542,65 +539,34 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
     function updateTorus() {
         torusMesh.rotation.x += 0.01;
         torusMesh.rotation.y += 0.01;
-
-        // for (let i = 0; i < 1000; i++) {
-        //     drawRandomDot(textureCanvasCtx);
-        //     texture.needsUpdate = true;
-        // }
     }
 
-    const portalRadialBounds = 1.0; // relative to portal size
-    // function testPortalBounds() {
-    //     const isOutside = camera.position.z > 0;
-    //     const distance = portalMesh.position.distanceTo(camera.position);
-    //     const withinPortalBounds = distance < portalRadialBounds;
-    //     if (wasOutside !== isOutside && withinPortalBounds) {
-    //         isInsidePortal = !isOutside;
-    //     }
-    //     wasOutside = isOutside;
-    // }
+    // generateFaceLabel(textureCanvasCtx, '#F00', '#0FF', '+X');
+    generateFaceGrid(canvasTexture, '#09F', 10.0);
+
+    console.log("canvasTexture:", canvasTexture);
 
     // const groundInsideMesh = createGround(4, 0, mapColors.get("orangeLight"), null);
     // setLayer(groundInsideMesh, mapLayers.get("inside"));
     // scene.add(groundInsideMesh);
 
-    const shelfInsideMesh = createGround(10, 1, mapColors.get("green"), texture);
-    setLayer(shelfInsideMesh, mapLayers.get("inside"));
-    scene.add(shelfInsideMesh);
-
-    const skyInsideMesh = createSphere(5, mapColors.get("orangeDark"), texture);
+    const skyInsideMesh  = createSphere(50.0, mapColors.get("orangeDark"), canvasTexture);
+    skyInsideMesh.position.y = 0.0
     setLayer(skyInsideMesh, mapLayers.get("inside"));
     scene.add(skyInsideMesh);
 
-    // const groundOutsideMesh = createGround(4, 4, mapColors.get("green"));
-    // setLayer(groundOutsideMesh, mapLayers.get("outside"));
-    // scene.add(groundOutsideMesh);
+    const shelfInsideMesh = createGround(100, 1, mapColors.get("green"), canvasTexture);
+    setLayer(shelfInsideMesh, mapLayers.get("inside"));
+    scene.add(shelfInsideMesh);
 
-    // const skyOutsideMesh = createSphere(mapColors.get("blue"));
-    // setLayer(skyOutsideMesh, mapLayers.get("outside"));
-    // scene.add(skyOutsideMesh);
-
-    // const boxMesh = createBox(0.2, 1, 0.2, mapColors.get("green"));
-    // boxMesh.position.set(0, 0, -0.3);
-    // setLayer(boxMesh, mapLayers.get("outside"));
-    // scene.add(boxMesh);
-
-    // const boxMesh2 = createBox(0.2, 0.2, 0.2, mapColors.get("green"));
-    // boxMesh2.position.set(-0.4, 0, 0.2);
-    // setLayer(boxMesh2, mapLayers.get("outside"));
-    // scene.add(boxMesh2);
-
-    // const boxMesh3 = createBox(0.2, 0.15, 0.2, mapColors.get("green"));
-    // boxMesh3.position.set(0.4, 0, 0.2);
-    // setLayer(boxMesh3, mapLayers.get("outside"));
-    // scene.add(boxMesh3);
+    const portalRadialBounds = 1.0; // relative to portal size
 
     const portalMesh = createPortal(portalRadialBounds * 2);
     portalMesh.position.set(0, 1.2, 0);
     setLayer(portalMesh, mapLayers.get("portal"));
     scene.add(portalMesh);
 
-    const torusMesh = createTorus(mapColors.get("grey"), texture);
+    const torusMesh = createTorus(mapColors.get("grey"), canvasTexture);
     torusMesh.position.set(0, 1, 0);
     scene.add(torusMesh);
 
@@ -775,12 +741,14 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
 
         portalMesh.material.side = isInsidePortal ? THREE.BackSide : THREE.FrontSide;
 
-        skyInsideMesh.material.clippingPlanes = [
-            clippingPlaneOutside,
-            clippingTopPlane,
-            clippingBottomPlane,
-            new THREE.Plane(clippingBottomUnitVector.clone(), -0.999)
-        ];
+        if (skyInsideMesh.material.hasOwnProperty("clippingPlanes")) {
+            skyInsideMesh.material.clippingPlanes = [
+                clippingPlaneOutside,
+                clippingTopPlane,
+                clippingBottomPlane,
+                new THREE.Plane(clippingBottomUnitVector.clone(), -0.999)
+            ];
+        }
 
         torusMesh.material.clippingPlanes = [
             new THREE.Plane(clippingBottomUnitVector.clone(), -0.999)
@@ -867,7 +835,7 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
 
         stats.end();
 
-        // Canvas elements doesn't trigger DOM updates, so we have to update the texture
+        // Canvas elements doesn't trigger DOM updates, so we have to mark them for updates
         portalTexture.needsUpdate = true;
         statsMesh.material.map.update();
     }
