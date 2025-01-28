@@ -289,7 +289,7 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
     const hemisphereLight = new THREE.HemisphereLight(0xffffff, 0xffffff, 3);
     scene.add(hemisphereLight);
 
-    // Setup texture`
+    // Setup canvas texture
     const textureCanvas = document.createElement('canvas');
     const canvasTexture = new THREE.CanvasTexture(textureCanvas);
 
@@ -536,9 +536,9 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
         return new THREE.Mesh(geometry, material);
     }
 
-    function updateTorus() {
-        torusMesh.rotation.x += 0.01;
-        torusMesh.rotation.y += 0.01;
+    function updateTorus(mesh) {
+        mesh.rotation.x += 0.01;
+        mesh.rotation.y += 0.01;
     }
 
     // generateFaceLabel(textureCanvasCtx, '#F00', '#0FF', '+X');
@@ -566,9 +566,9 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
     setLayer(portalMesh, mapLayers.get("portal"));
     scene.add(portalMesh);
 
-    const torusMesh = createTorus(mapColors.get("grey"), canvasTexture);
-    torusMesh.position.set(0, 1, 0);
-    scene.add(torusMesh);
+    // const torusMesh = createTorus(mapColors.get("grey"), canvasTexture);
+    // torusMesh.position.set(0, 1, 0);
+    // scene.add(torusMesh);
 
     // // Initialize sound and play song with sound analyzer
     // const soundListener = initListener(torusMesh);
@@ -653,11 +653,11 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
             camera.layers.enable(mapLayers.get("inside"));
         // }
 
-        torusMesh.material.clippingPlanes = (isInsidePortal) ? [
-            clippingPlaneInside
-        ] : [
-            clippingPlaneOutside
-        ];
+        // torusMesh.material.clippingPlanes = (isInsidePortal) ? [
+        //     clippingPlaneInside
+        // ] : [
+        //     clippingPlaneOutside
+        // ];
 
         portalRenderer.clippingPlanes = (isInsidePortal) ? [
             clippingPlaneInside
@@ -784,9 +784,9 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
             skyInsideMesh.material.uniforms.time.value = timeElapsed; // <= DOES NOT WORK w/ MeshBasicMaterial
         }
 
-        torusMesh.material.clippingPlanes = [
-            new THREE.Plane(clippingBottomUnitVector.clone(), -0.999)
-        ];
+        // torusMesh.material.clippingPlanes = [
+        //     new THREE.Plane(clippingBottomUnitVector.clone(), -0.999)
+        // ];
 
         uniforms.time["value"] = timeElapsed;
 
@@ -837,7 +837,7 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
 
         // testPortalBounds();
 
-        updateTorus();
+        // updateTorus(torusMesh);
         updateCameraPosition();
         updateCameraTarget();
 
