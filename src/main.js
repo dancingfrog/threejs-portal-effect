@@ -279,7 +279,7 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
     player.add(camera);
 
     // // Setup Scene
-    // const updateScene = await setup(renderer, scene, camera, controllers, player);
+    const updateScene = await setup(renderer, scene, camera, controllers, player);
 
     // Setup Light
     const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
@@ -671,6 +671,11 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
 
     function renderWorld() {
 
+        const delta = clock.getDelta();
+        const timeElapsed = clock.getElapsedTime();
+
+        const sceneDataUpdate = {};
+
         portalRenderer.clippingPlanes = [];
 
         // camera.layers.enable(mapLayers.get("portal"));
@@ -739,21 +744,6 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
         line.geometry = lineGeometry;
         line.material.clippingPlanes = null;
 
-        portalMesh.material.side = isInsidePortal ? THREE.BackSide : THREE.FrontSide;
-
-        if (skyInsideMesh.material.hasOwnProperty("clippingPlanes")) {
-            skyInsideMesh.material.clippingPlanes = [
-                clippingPlaneOutside,
-                clippingTopPlane,
-                clippingBottomPlane,
-                new THREE.Plane(clippingBottomUnitVector.clone(), -0.999)
-            ];
-        }
-
-        torusMesh.material.clippingPlanes = [
-            new THREE.Plane(clippingBottomUnitVector.clone(), -0.999)
-        ];
-
         const new_data = JSON.stringify({
             "topΘ": clippingTopUnitAngleToDirection,
             "topY": clippingTopY,
@@ -779,13 +769,44 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
             clippingBottomPlane
         ];
 
+        portalMesh.material.side = isInsidePortal ? THREE.BackSide : THREE.FrontSide;
+
+        if (skyInsideMesh.material.hasOwnProperty("clippingPlanes")) {
+            skyInsideMesh.material.clippingPlanes = [
+                clippingPlaneOutside,
+                clippingTopPlane,
+                clippingBottomPlane,
+                new THREE.Plane(clippingBottomUnitVector.clone(), -0.999)
+            ];
+        }
+
+        if (skyInsideMesh.material.hasOwnProperty("uniforms")) {
+            skyInsideMesh.material.uniforms.time.value = timeElapsed; // <= DOES NOT WORK w/ MeshBasicMaterial
+        }
+
+        torusMesh.material.clippingPlanes = [
+            new THREE.Plane(clippingBottomUnitVector.clone(), -0.999)
+        ];
+
+        uniforms.time["value"] = timeElapsed;
+
+        updateScene(
+            currentSession,
+            delta,
+            timeElapsed,
+            (Object.keys(sceneDataUpdate).length > 0) ? sceneDataUpdate : null,
+            null,
+            [
+                clippingPlaneOutside,
+                clippingTopPlane,
+                clippingBottomPlane,
+                new THREE.Plane(clippingBottomUnitVector.clone(), -0.999)
+            ]);
+
         renderer.render(scene, camera);
     }
 
     function animate(t) {
-
-        const delta = clock.getDelta();
-        const timeElapsed = clock.getElapsedTime();
 
         if (step_t === null) {
             step_t = t
@@ -794,8 +815,6 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
         }
 
         // console.log("step_t:", step_t);
-
-        const sceneDataUpdate = {};
 
         stats.begin();
 
@@ -817,14 +836,6 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
         // }
 
         // testPortalBounds();
-
-        uniforms.time["value"] = timeElapsed;
-
-        if (skyInsideMesh.material.hasOwnProperty("uniforms")) {
-            skyInsideMesh.material.uniforms.time.value = timeElapsed; // <= DOES NOT WORK w/ MeshBasicMaterial
-        }
-
-        // updateScene(currentSession, delta, timeElapsed, (Object.keys(sceneDataUpdate).length > 0) ? sceneDataUpdate : null);
 
         updateTorus();
         updateCameraPosition();

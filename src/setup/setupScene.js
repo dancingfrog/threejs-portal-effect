@@ -8,15 +8,19 @@ import defaultFragmentShader from '../shaders/default/fragmentShader.glsl';
 
 import wavesVertexShader from '../shaders/waves/vertexShader.glsl';
 
-const SIZE = 4;
+const SIZE = 5;
 const RESOLUTION = 512;
 
-let uniforms, textureRepeatScale = 100, water;
+let sceneGroup, textureRepeatScale, uniforms, water;
 
 export default async function setupScene (renderer, scene, camera, controllers, player) {
 
     // Set player view
     player.add(camera);
+
+    sceneGroup = new THREE.Group();
+
+    textureRepeatScale = 10
 
     uniforms = {
         ...THREE.ShaderLib.physical.uniforms,
@@ -79,19 +83,25 @@ export default async function setupScene (renderer, scene, camera, controllers, 
     // Place lights
     const directionalLight = new THREE.DirectionalLight(0xffffff, 0.9)
     directionalLight.position.set(-0.5, 10, -10)
-    scene.add(directionalLight)
+    sceneGroup.add(directionalLight)
 
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.3)
-    scene.add(ambientLight)
+    sceneGroup.add(ambientLight)
 
     // const pmremGenerator = new THREE.PMREMGenerator( renderer );
     // const sceneEnv = new THREE.Scene();
 
     // Place objects
-    scene.add(plane);
-    scene.add(water);
+    sceneGroup.add(plane);
+    sceneGroup.add(water);
 
-    return function (currentSession, delta, time, data_in, sendData_out) {
+    scene.add(sceneGroup);
+
+    sceneGroup.translateX(0.0);
+    sceneGroup.translateY(1.0);
+    sceneGroup.translateZ(-5.0);
+
+    return function (currentSession, delta, time, data_in, sendData_out, clippingPlanes) {
 
         const data_out = {};
 
@@ -102,6 +112,16 @@ export default async function setupScene (renderer, scene, camera, controllers, 
         // update the time uniform(s)
         plane.material.uniforms.time.value = time
         water.material.uniforms[ 'time' ].value += 0.1 / 60.0;
+
+        if (clippingPlanes !== null && clippingPlanes.length > 0) {
+            sceneGroup.traverse(function (child) {
+                if (child.hasOwnProperty("material")) {
+                    child.material.clippingPlanes = [
+                        ...clippingPlanes
+                    ];
+                }
+            });
+        }
 
         if (data_out.hasOwnProperty("event") && typeof sendData_out === "function") {
             sendData_out(data_out);
