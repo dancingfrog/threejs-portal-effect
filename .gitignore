@@ -33,3 +33,5 @@ data/
 _targets/
 *.csv
 *.xlsx
+
+public/assets/material/textures/penguins-skybox-pack
