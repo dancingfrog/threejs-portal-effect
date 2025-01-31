@@ -62,7 +62,7 @@ mapKeys.set("ArrowDown", "isDown");
 mapKeys.set("d", "isRight");
 mapKeys.set("ArrowRight", "isRight");
 
-let currentSession;
+let currentSession = null;
 let isInsidePortal = false;
 let wasOutside = true;
 
@@ -704,21 +704,30 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
         // console.log(xrCameraA);
 
         const viewingPlaneLeft = -1; // x left
-        const viewingPlaneRight = 2; // x right
+        const viewingPlaneRight = 1; // x right
         const viewingPlaneTop = 2; // y top
         const viewingPlaneBottom = 1; // y bottom
         const viewingPlaneDepth = 0; // z
+        const viewingPlaneHorizonalCenter = 0;
+        const viewingPlaneVerticalCenter= (viewingPlaneBottom + viewingPlaneTop) / 2; // (viewingPlaneTop - viewingPlaneBottom)/ 2 + viewingPlaneBottom
 
+        const clippingRightP = new THREE.Vector3(viewingPlaneRight, xrCameraA.y, viewingPlaneDepth);
         const clippingTopP = new THREE.Vector3(xrCameraA.x, viewingPlaneTop, viewingPlaneDepth);
         const clippingBottomP = new THREE.Vector3(xrCameraA.x, viewingPlaneBottom, viewingPlaneDepth);
 
+        const vDRight = new THREE.Vector3();
+        vDRight.subVectors(clippingRightP, xrCameraA);
         const vDTop = new THREE.Vector3();
         vDTop.subVectors(clippingTopP, xrCameraA);
         const vDBottom = new THREE.Vector3();
         vDBottom.subVectors(clippingBottomP, xrCameraA);
 
+        const clippingRightUnitVector = new THREE.Vector3(-1.0, 0, 0);
+        const clippingRightDirection = vDRight.clone().cross(new THREE.Vector3(0, -1.0, 0)).normalize();
+        const clippingRightUnitAngleToDirection = clippingRightUnitVector.angleTo(clippingRightDirection.clone());
+        const clippingRightX = Math.cos(clippingRightUnitAngleToDirection) * viewingPlaneRight;
         const clippingTopUnitVector = new THREE.Vector3(0, -1.0, 0);
-        const clippingTopDirection = vDTop.clone().cross(new THREE.Vector3(1, 0, 0)).normalize();
+        const clippingTopDirection = vDTop.clone().cross(new THREE.Vector3(1.0, 0, 0)).normalize();
         const clippingTopUnitAngleToDirection = clippingTopUnitVector.angleTo(clippingTopDirection.clone());
         const clippingTopY = Math.cos(clippingTopUnitAngleToDirection) * viewingPlaneTop;
         const clippingBottomUnitVector = (xrCameraA.z > viewingPlaneDepth) ?
@@ -732,19 +741,25 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
         // console.log("clippingBottomY:", clippingBottomY);
 
         // // Create points on a line
-        points[0] = new THREE.Vector3( 0, clippingTopP.y, 0 ); // xrCameraA; // new THREE.Vector3( 0, 1.0, 0.0 );
-        points[1] = getDirectionalEndPoint(points[0], clippingTopDirection.clone()); // clippingBottomDirection.clone()); // xrCameraDirection.clone());
+        points[0] = new THREE.Vector3( viewingPlaneRight, viewingPlaneVerticalCenter, viewingPlaneDepth);
+        points[1] = getDirectionalEndPoint(points[0], clippingRightDirection.clone());
+        // points[0] = new THREE.Vector3( viewingPlaneHorizonalCenter, clippingTopP.y, 0 );
+        // points[1] = getDirectionalEndPoint(points[0], clippingTopDirection.clone()); // clippingBottomDirection.clone()); // xrCameraDirection.clone());
         lineGeometry.setFromPoints(points);
 
-        // const clippingBottomPlane = new THREE.Plane(clippingBottomUnitVector.clone(), -(viewingPlaneBottom - 0.001));
-        const clippingBottomPlane = new THREE.Plane(clippingBottomDirection.clone(), -(viewingPlaneBottom - 0.001) * clippingBottomY);
+        // const clippingRightPlane = new THREE.Plane(clippingRightUnitVector.clone(), 1.0);
+        const clippingRightPlane = new THREE.Plane(clippingRightDirection.clone(), clippingRightX);
         // const clippingTopPlane = new THREE.Plane(clippingTopUnitVector.clone(), 2.0);
         const clippingTopPlane = new THREE.Plane(clippingTopDirection.clone(), clippingTopY);
+        // const clippingBottomPlane = new THREE.Plane(clippingBottomUnitVector.clone(), -(viewingPlaneBottom - 0.001));
+        const clippingBottomPlane = new THREE.Plane(clippingBottomDirection.clone(), -(viewingPlaneBottom - 0.001) * clippingBottomY);
 
         line.geometry = lineGeometry;
         line.material.clippingPlanes = null;
 
         const new_data = JSON.stringify({
+            "rightΘ": clippingRightUnitAngleToDirection,
+            "rightX": clippingRightX,
             "topΘ": clippingTopUnitAngleToDirection,
             "topY": clippingTopY,
             "bottomΘ": clippingBottomUnitAngleToDirection,
@@ -760,11 +775,13 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
 
         renderer.clippingPlanes = (xrCameraA.z > viewingPlaneDepth) ? [
             clippingPlaneOutside,
+            clippingRightPlane,
             clippingTopPlane,
             clippingBottomPlane
         ] : [
             clippingPlaneInside,
             clippingPlaneOutside,
+            clippingRightPlane,
             clippingTopPlane,
             clippingBottomPlane
         ];
@@ -774,6 +791,7 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
         if (skyInsideMesh.material.hasOwnProperty("clippingPlanes")) {
             skyInsideMesh.material.clippingPlanes = [
                 clippingPlaneOutside,
+                clippingRightPlane,
                 clippingTopPlane,
                 clippingBottomPlane,
                 new THREE.Plane(clippingBottomUnitVector.clone(), -0.999)
@@ -798,6 +816,7 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
             null,
             [
                 clippingPlaneOutside,
+                clippingRightPlane,
                 clippingTopPlane,
                 clippingBottomPlane,
                 new THREE.Plane(clippingBottomUnitVector.clone(), -0.999)
@@ -841,7 +860,7 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
         updateCameraPosition();
         updateCameraTarget();
 
-        renderPortal();
+        if (!nativeWebXRSupport || currentSession === null) renderPortal();
         renderWorld();
 
         stats.end();
