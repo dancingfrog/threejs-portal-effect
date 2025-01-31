@@ -640,25 +640,25 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
         return B;
     }
 
-    // // Draw a line from pointA in the given direction at distance 100
-    // // From https://stackoverflow.com/questions/38205340/draw-line-in-direction-of-raycaster-in-three-js#answer-42498256
-    // const pointA = new THREE.Vector3( 0, 1.0, -0.0 );
-    // const pointB = getDirectionalEndPoint(pointA, new THREE.Vector3( 0.0, -1.0, -1.0 )); // <= , direction
-    //
-    // // Create points on a line
-    // const points = [];
-    // points.push(pointA);
-    // points.push(pointB);
-    //
-    // const lineGeometry = new THREE.BufferGeometry();
-    //
-    // lineGeometry.setFromPoints(points);
-    //
-    // const geometry = lineGeometry;
-    // const material = new THREE.LineBasicMaterial( { color : 0xff0000 } );
-    // const line = new THREE.Line( geometry, material );
-    // setLayer(line, mapLayers.get("outside"));
-    // scene.add( line );
+    // Draw a line from pointA in the given direction at distance 100
+    // From https://stackoverflow.com/questions/38205340/draw-line-in-direction-of-raycaster-in-three-js#answer-42498256
+    const pointA = new THREE.Vector3( 0, 0.0, 0.0 );
+    const pointB = getDirectionalEndPoint(pointA, new THREE.Vector3( 0.0, -1.0, 0.0 )); // <= , direction
+
+    // Create points on a line
+    const points = [];
+    points.push(pointA);
+    points.push(pointB);
+
+    const lineGeometry = new THREE.BufferGeometry();
+
+    lineGeometry.setFromPoints(points);
+
+    const geometry = lineGeometry;
+    const material = new THREE.LineBasicMaterial( { color : 0xff0000 } );
+    const line = new THREE.Line( geometry, material );
+    setLayer(line, mapLayers.get("outside"));
+    scene.add( line );
 
     // Setup Clipping planes
     const clippingPlaneInside = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
@@ -727,7 +727,7 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
 
         const viewingPlaneLeft = -1; // x left
         const viewingPlaneRight = 1; // x right
-        const viewingPlaneTop = 2; // y top
+        const viewingPlaneTop = 2.5; // y top
         const viewingPlaneBottom = 1; // y bottom
         const viewingPlaneDepth = 0; // z
         const viewingPlaneHorizonalCenter = 0;
@@ -780,9 +780,9 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
         // line.material.clippingPlanes = null;
 
         // const clippingLeftPlane = new THREE.Plane(clippingLeftUnitVector.clone(), 1.0);
-        const clippingLeftPlane = new THREE.Plane(clippingLeftDirection.clone(), clippingLeftX * viewingPlaneLeft);
+        const clippingLeftPlane = new THREE.Plane(clippingLeftDirection.clone(), -clippingLeftX);
         // const clippingRightPlane = new THREE.Plane(clippingRightUnitVector.clone(), 1.0);
-        const clippingRightPlane = new THREE.Plane(clippingRightDirection.clone(), clippingRightX * viewingPlaneRight);
+        const clippingRightPlane = new THREE.Plane(clippingRightDirection.clone(), clippingRightX);
         // const clippingTopPlane = new THREE.Plane(clippingTopUnitVector.clone(), 2.0);
         const clippingTopPlane = new THREE.Plane(clippingTopDirection.clone(), clippingTopY);
         // const clippingBottomPlane = new THREE.Plane(clippingBottomUnitVector.clone(), -(viewingPlaneBottom - 0.001));
@@ -866,6 +866,15 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
         // // Canvas elements doesn't trigger DOM updates, so we have to mark them for updates
         // portalTexture.needsUpdate = true;
         // statsMesh.material.map.update();
+
+        // // Try to show controllers at all times
+        // for (let hand of ["left", "right"]) {
+        //     if (!!controllers[hand]
+        //         && controllers[hand] !== null
+        //         && controllers[hand].hasOwnProperty("mesh") && controllers[hand].mesh.material.hasOwnProperty("clippingPlanes")) {
+        //         controllers[hand].mesh.material.clippingPlanes = null;
+        //     }
+        // }
 
         renderer.render(scene, camera);
     }
