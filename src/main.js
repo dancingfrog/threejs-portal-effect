@@ -9,6 +9,7 @@ import { XRControllerModelFactory } from "three/addons/webxr/XRControllerModelFa
 
 import Stats from "https://unpkg.com/three@0.118.3/examples/jsm/libs/stats.module.js";
 
+import loadManager from "./loadManager";
 import setupScene from "./setup/setupScene";
 
 // import wavesVertexShader from "./shaders/waves/vertexShader.glsl";
@@ -66,7 +67,10 @@ let currentSession = null;
 let isInsidePortal = false;
 let wasOutside = true;
 
-function initListener (anchorObject) {
+let soundAnalyzer = null;
+const soundData = [];
+
+function initSound (anchorObject, initSoundPath) {
     const listener = new THREE.AudioListener();
 
     anchorObject.add(listener);
@@ -75,32 +79,49 @@ function initListener (anchorObject) {
 
     window.listenerAnchor = anchorObject;
 
-    return listener;
-}
-
-function initSoundAnalyzer (anchorObject, initSoundPath) {
-
     return new Promise((resolve, reject) => {
 
         const sound = new THREE.PositionalAudio(anchorObject.listener); // THREE.Audio(listener) ... for basic playback
-        const loader = new THREE.AudioLoader();
+        const loader = new THREE.AudioLoader(loadManager);
+
+        document.body.append(loadManager.div);
 
         loader.load(initSoundPath, (buffer) => {
             sound.setBuffer(buffer);
             sound.setRefDistance(1);
             sound.setVolume(1);
-            // sound.play();
 
             anchorObject['sound'] = sound;
 
-            const analyzer = new THREE.AudioAnalyser(sound, 32);
+            console.log("Play sound!");
 
+            sound.play();
+
+            setTimeout(
+                resolve,
+                1500,
+                sound
+            );
+            // });
+
+        });
+    });
+}
+
+function initSoundAnalyzer (sound) {
+
+    return new Promise((resolve, reject) => {
+
+        const analyzer = new THREE.AudioAnalyser(sound, 32);
+
+        loadManager.addLoadHandler(() => {
             setTimeout(
                 resolve,
                 1500,
                 analyzer
             );
         });
+
     });
 }
 
@@ -566,14 +587,10 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
     setLayer(portalMesh, mapLayers.get("portal"));
     scene.add(portalMesh);
 
-    // const torusMesh = createTorus(mapColors.get("grey"), canvasTexture);
-    // torusMesh.position.set(0, 1, 0);
-    // scene.add(torusMesh);
-
-    // // Initialize sound and play song with sound analyzer
-    // const soundListener = initListener(torusMesh);
-    // const soundAnalyzer = await initSoundAnalyzer(torusMesh, "assets/audio/Dream Song.mp3");
-    // const soundData = [];
+    const torusMesh = createTorus(mapColors.get("grey"), canvasTexture);
+    torusMesh.position.set(0, 1, 0);
+    torusMesh.scale.set(2.0, 2.0, 2.0);
+    scene.add(torusMesh);
 
     const speed = 0.05;
     const directionVector = new THREE.Vector3();
@@ -618,25 +635,25 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
         return B;
     }
 
-    // Draw a line from pointA in the given direction at distance 100
-    // From https://stackoverflow.com/questions/38205340/draw-line-in-direction-of-raycaster-in-three-js#answer-42498256
-    const pointA = new THREE.Vector3( 0, 1.0, -0.0 );
-    const pointB = getDirectionalEndPoint(pointA, new THREE.Vector3( 0.0, -1.0, -1.0 )); // <= , direction
-
-    // Create points on a line
-    const points = [];
-    points.push(pointA);
-    points.push(pointB);
-
-    const lineGeometry = new THREE.BufferGeometry();
-
-    lineGeometry.setFromPoints(points);
-
-    const geometry = lineGeometry;
-    const material = new THREE.LineBasicMaterial( { color : 0xff0000 } );
-    const line = new THREE.Line( geometry, material );
-    setLayer(line, mapLayers.get("outside"));
-    scene.add( line );
+    // // Draw a line from pointA in the given direction at distance 100
+    // // From https://stackoverflow.com/questions/38205340/draw-line-in-direction-of-raycaster-in-three-js#answer-42498256
+    // const pointA = new THREE.Vector3( 0, 1.0, -0.0 );
+    // const pointB = getDirectionalEndPoint(pointA, new THREE.Vector3( 0.0, -1.0, -1.0 )); // <= , direction
+    //
+    // // Create points on a line
+    // const points = [];
+    // points.push(pointA);
+    // points.push(pointB);
+    //
+    // const lineGeometry = new THREE.BufferGeometry();
+    //
+    // lineGeometry.setFromPoints(points);
+    //
+    // const geometry = lineGeometry;
+    // const material = new THREE.LineBasicMaterial( { color : 0xff0000 } );
+    // const line = new THREE.Line( geometry, material );
+    // setLayer(line, mapLayers.get("outside"));
+    // scene.add( line );
 
     // Setup Clipping planes
     const clippingPlaneInside = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
@@ -745,6 +762,8 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
         const clippingBottomY = Math.cos(clippingBottomUnitAngleToDirection) * viewingPlaneBottom; // viewingPlaneBottom = 1.0 // length on unit circle
 
         // // Set points on a line to show projected normal of given clipping plane
+        // const lineGeometry = new THREE.BufferGeometry(),
+        //     points = [];
         // points[0] = new THREE.Vector3( viewingPlaneLeft, viewingPlaneVerticalCenter, viewingPlaneDepth);
         // points[1] = getDirectionalEndPoint(points[0], clippingLeftDirection.clone());
         // // points[0] = new THREE.Vector3( viewingPlaneRight, viewingPlaneVerticalCenter, viewingPlaneDepth);
@@ -752,7 +771,6 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
         // // points[0] = new THREE.Vector3( viewingPlaneHorizonalCenter, clippingTopP.y, 0 );
         // // points[1] = getDirectionalEndPoint(points[0], clippingTopDirection.clone()); // clippingBottomDirection.clone()); // xrCameraDirection.clone());
         // lineGeometry.setFromPoints(points);
-        //
         // line.geometry = lineGeometry;
         // line.material.clippingPlanes = null;
 
@@ -815,11 +833,13 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
             skyInsideMesh.material.uniforms.time.value = timeElapsed; // <= DOES NOT WORK w/ MeshBasicMaterial
         }
 
-        // torusMesh.material.clippingPlanes = [
-        //     new THREE.Plane(clippingBottomUnitVector.clone(), -0.999)
-        // ];
-
-        uniforms.time["value"] = timeElapsed;
+        torusMesh.material.clippingPlanes = [
+            clippingPlaneOutside,
+            clippingLeftPlane,
+            clippingRightPlane,
+            clippingTopPlane,
+            clippingBottomPlane,
+        ];
 
         updateScene(
             currentSession,
@@ -836,12 +856,17 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
                 new THREE.Plane(clippingBottomUnitVector.clone(), -0.999)
             ]);
 
+        uniforms.time["value"] = timeElapsed;
+
         // // Canvas elements doesn't trigger DOM updates, so we have to mark them for updates
         // portalTexture.needsUpdate = true;
         // statsMesh.material.map.update();
 
         renderer.render(scene, camera);
     }
+
+
+
 
     function animate(t) {
 
@@ -855,26 +880,26 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
 
         stats.begin();
 
-        // if (!!soundAnalyzer
-        //     && soundAnalyzer.hasOwnProperty("analyser")
-        //     && typeof soundAnalyzer.getFrequencyData === "function"
-        // ) {
-        //
-        //     if (torusMesh.hasOwnProperty("sound") && !!torusMesh['sound'].isPlaying) {
-        //
-        //         // sound analysis
-        //         soundData.push([...soundAnalyzer.getFrequencyData()]);
-        //
-        //         // console.log("Last soundData:", soundData[(soundData.length - 1)]);
-        //     }
-        //
+        if (!!soundAnalyzer
+            && soundAnalyzer.hasOwnProperty("analyser")
+            && typeof soundAnalyzer.getFrequencyData === "function"
+        ) {
+
+            if (torusMesh.hasOwnProperty("sound") && !!torusMesh['sound'].isPlaying) {
+
+                // sound analysis
+                soundData.push([...soundAnalyzer.getFrequencyData()]);
+
+                // console.log("Last soundData:", soundData[(soundData.length - 1)]);
+            }
+
         // } else {
-        //     console.log("soundAnalyzer is not ready:", soundAnalyzer);s
-        // }
+        //     console.log("soundAnalyzer is not ready:", soundAnalyzer);
+        }
 
         // testPortalBounds();
 
-        // updateTorus(torusMesh);
+        updateTorus(torusMesh);
         updateCameraPosition();
         updateCameraTarget();
 
@@ -973,9 +998,11 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
                 currentSession.addEventListener("end", onSessionEnded);
             });
 
-        // if (torusMesh.hasOwnProperty("sound")) {
-        //     torusMesh['sound'].play();
-        // }
+        if (torusMesh.hasOwnProperty("sound") && !torusMesh['sound'].isPlaying) {
+            console.log("Play sound!");
+            torusMesh['sound'].play();
+        }
+
     }
 
     function onSessionEnded() {
@@ -1006,6 +1033,7 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
         resize(previewWindow.width, previewWindow.height);
     });
 
+
     document.body.appendChild(xr_button);
 
     // window.addEventListener("resize", handleResize);
@@ -1015,6 +1043,11 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
     resize(previewWindow.width, previewWindow.height);
 
     renderer.setAnimationLoop(animate);
+
+    // Start loading the music
+    setTimeout(async () => {
+        soundAnalyzer = await initSoundAnalyzer(await initSound(torusMesh, "assets/audio/MIXST002-Portal.mp3"));
+    }, 533);
 }
 
 initScene(setupScene)

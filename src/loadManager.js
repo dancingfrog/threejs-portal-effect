@@ -21,7 +21,7 @@ loadManager.handlers = [
     () => {
         loadingElem.style.opacity = 1.0;
 
-        const fadeProgressBar =() => {
+        const fadeProgressBar = () => {
             loadingElem.style.opacity = loadingElem.style.opacity - 0.1;
             if (typeof fadeProgressBar == "function" && loadingElem.style.opacity > 0.0) {
                 setTimeout(fadeProgressBar, 33);
