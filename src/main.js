@@ -207,14 +207,14 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
     stats.dom.style.backgroundColor = "black";
     document.body.appendChild(stats.dom);
 
-    const statsMesh = new HTMLMesh( stats.dom );
-    statsMesh.position.x = -0.75;
-    statsMesh.position.y = 1.25;
-    statsMesh.position.z = -0.5;
-    statsMesh.rotation.y = Math.PI / 4;
-    statsMesh.scale.setScalar( 2 );
-
-    scene.add( statsMesh );
+    // const statsMesh = new HTMLMesh( stats.dom );
+    // statsMesh.position.x = -0.75;
+    // statsMesh.position.y = 1.25;
+    // statsMesh.position.z = -0.5;
+    // statsMesh.rotation.y = Math.PI / 4;
+    // statsMesh.scale.setScalar( 2 );
+    //
+    // scene.add( statsMesh );
 
     const camera = new THREE.PerspectiveCamera(
         50,
@@ -711,10 +711,13 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
         const viewingPlaneHorizonalCenter = 0;
         const viewingPlaneVerticalCenter= (viewingPlaneBottom + viewingPlaneTop) / 2; // (viewingPlaneTop - viewingPlaneBottom)/ 2 + viewingPlaneBottom
 
+        const clippingLeftP = new THREE.Vector3(viewingPlaneLeft, xrCameraA.y, viewingPlaneDepth);
         const clippingRightP = new THREE.Vector3(viewingPlaneRight, xrCameraA.y, viewingPlaneDepth);
         const clippingTopP = new THREE.Vector3(xrCameraA.x, viewingPlaneTop, viewingPlaneDepth);
         const clippingBottomP = new THREE.Vector3(xrCameraA.x, viewingPlaneBottom, viewingPlaneDepth);
 
+        const vDLeft = new THREE.Vector3();
+        vDLeft.subVectors(clippingLeftP, xrCameraA);
         const vDRight = new THREE.Vector3();
         vDRight.subVectors(clippingRightP, xrCameraA);
         const vDTop = new THREE.Vector3();
@@ -722,6 +725,10 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
         const vDBottom = new THREE.Vector3();
         vDBottom.subVectors(clippingBottomP, xrCameraA);
 
+        const clippingLeftUnitVector = new THREE.Vector3(1.0, 0, 0);
+        const clippingLeftDirection = vDLeft.clone().cross(new THREE.Vector3(0, 1.0, 0)).normalize();
+        const clippingLeftUnitAngleToDirection = clippingLeftUnitVector.angleTo(clippingLeftDirection.clone());
+        const clippingLeftX = Math.cos(clippingLeftUnitAngleToDirection) * viewingPlaneLeft;
         const clippingRightUnitVector = new THREE.Vector3(-1.0, 0, 0);
         const clippingRightDirection = vDRight.clone().cross(new THREE.Vector3(0, -1.0, 0)).normalize();
         const clippingRightUnitAngleToDirection = clippingRightUnitVector.angleTo(clippingRightDirection.clone());
@@ -737,28 +744,31 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
         const clippingBottomUnitAngleToDirection = clippingBottomUnitVector.angleTo(clippingBottomDirection.clone());
         const clippingBottomY = Math.cos(clippingBottomUnitAngleToDirection) * viewingPlaneBottom; // viewingPlaneBottom = 1.0 // length on unit circle
 
-        // console.log("clippingBottomAngleTo:", clippingBottomUnitAngleToDirection);
-        // console.log("clippingBottomY:", clippingBottomY);
+        // // Set points on a line to show projected normal of given clipping plane
+        // points[0] = new THREE.Vector3( viewingPlaneLeft, viewingPlaneVerticalCenter, viewingPlaneDepth);
+        // points[1] = getDirectionalEndPoint(points[0], clippingLeftDirection.clone());
+        // // points[0] = new THREE.Vector3( viewingPlaneRight, viewingPlaneVerticalCenter, viewingPlaneDepth);
+        // // points[1] = getDirectionalEndPoint(points[0], clippingRightDirection.clone());
+        // // points[0] = new THREE.Vector3( viewingPlaneHorizonalCenter, clippingTopP.y, 0 );
+        // // points[1] = getDirectionalEndPoint(points[0], clippingTopDirection.clone()); // clippingBottomDirection.clone()); // xrCameraDirection.clone());
+        // lineGeometry.setFromPoints(points);
+        //
+        // line.geometry = lineGeometry;
+        // line.material.clippingPlanes = null;
 
-        // // Create points on a line
-        points[0] = new THREE.Vector3( viewingPlaneRight, viewingPlaneVerticalCenter, viewingPlaneDepth);
-        points[1] = getDirectionalEndPoint(points[0], clippingRightDirection.clone());
-        // points[0] = new THREE.Vector3( viewingPlaneHorizonalCenter, clippingTopP.y, 0 );
-        // points[1] = getDirectionalEndPoint(points[0], clippingTopDirection.clone()); // clippingBottomDirection.clone()); // xrCameraDirection.clone());
-        lineGeometry.setFromPoints(points);
-
+        // const clippingLeftPlane = new THREE.Plane(clippingLeftUnitVector.clone(), 1.0);
+        const clippingLeftPlane = new THREE.Plane(clippingLeftDirection.clone(), clippingLeftX * viewingPlaneLeft);
         // const clippingRightPlane = new THREE.Plane(clippingRightUnitVector.clone(), 1.0);
-        const clippingRightPlane = new THREE.Plane(clippingRightDirection.clone(), clippingRightX);
+        const clippingRightPlane = new THREE.Plane(clippingRightDirection.clone(), clippingRightX * viewingPlaneRight);
         // const clippingTopPlane = new THREE.Plane(clippingTopUnitVector.clone(), 2.0);
         const clippingTopPlane = new THREE.Plane(clippingTopDirection.clone(), clippingTopY);
         // const clippingBottomPlane = new THREE.Plane(clippingBottomUnitVector.clone(), -(viewingPlaneBottom - 0.001));
-        const clippingBottomPlane = new THREE.Plane(clippingBottomDirection.clone(), -(viewingPlaneBottom - 0.001) * clippingBottomY);
-
-        line.geometry = lineGeometry;
-        line.material.clippingPlanes = null;
+        const clippingBottomPlane = new THREE.Plane(clippingBottomDirection.clone(), clippingBottomY * -(viewingPlaneBottom - 0.001));
 
         const new_data = JSON.stringify({
-            "rightΘ": clippingRightUnitAngleToDirection,
+            "leftΘ": clippingLeftUnitAngleToDirection,
+            "leftX": clippingLeftX,
+             "rightΘ": clippingRightUnitAngleToDirection,
             "rightX": clippingRightX,
             "topΘ": clippingTopUnitAngleToDirection,
             "topY": clippingTopY,
@@ -775,12 +785,14 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
 
         renderer.clippingPlanes = (xrCameraA.z > viewingPlaneDepth) ? [
             clippingPlaneOutside,
+            clippingLeftPlane,
             clippingRightPlane,
             clippingTopPlane,
             clippingBottomPlane
         ] : [
             clippingPlaneInside,
             clippingPlaneOutside,
+            clippingLeftPlane,
             clippingRightPlane,
             clippingTopPlane,
             clippingBottomPlane
@@ -791,6 +803,7 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
         if (skyInsideMesh.material.hasOwnProperty("clippingPlanes")) {
             skyInsideMesh.material.clippingPlanes = [
                 clippingPlaneOutside,
+                clippingLeftPlane,
                 clippingRightPlane,
                 clippingTopPlane,
                 clippingBottomPlane,
@@ -816,11 +829,16 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
             null,
             [
                 clippingPlaneOutside,
+                clippingLeftPlane,
                 clippingRightPlane,
                 clippingTopPlane,
                 clippingBottomPlane,
                 new THREE.Plane(clippingBottomUnitVector.clone(), -0.999)
             ]);
+
+        // // Canvas elements doesn't trigger DOM updates, so we have to mark them for updates
+        // portalTexture.needsUpdate = true;
+        // statsMesh.material.map.update();
 
         renderer.render(scene, camera);
     }
@@ -860,14 +878,10 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
         updateCameraPosition();
         updateCameraTarget();
 
-        if (!nativeWebXRSupport || currentSession === null) renderPortal();
+        if (currentSession === null || !nativeWebXRSupport) renderPortal();
         renderWorld();
 
         stats.end();
-
-        // Canvas elements doesn't trigger DOM updates, so we have to mark them for updates
-        portalTexture.needsUpdate = true;
-        statsMesh.material.map.update();
     }
 
     function resize(width, height) {
