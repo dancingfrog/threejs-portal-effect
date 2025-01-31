@@ -592,6 +592,11 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
     torusMesh.scale.set(2.0, 2.0, 2.0);
     scene.add(torusMesh);
 
+    // Start loading the music
+    setTimeout(async () => {
+        soundAnalyzer = await initSoundAnalyzer(await initSound(torusMesh, "assets/audio/MIXST002-Portal.mp3"));
+    }, 533);
+
     const speed = 0.05;
     const directionVector = new THREE.Vector3();
     function up() {
@@ -998,11 +1003,11 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
                 currentSession.addEventListener("end", onSessionEnded);
             });
 
-        if (torusMesh.hasOwnProperty("sound") && !torusMesh['sound'].isPlaying) {
+        if (torusMesh.hasOwnProperty("sound")) {
             console.log("Play sound!");
+            torusMesh['sound'].pause();
             torusMesh['sound'].play();
         }
-
     }
 
     function onSessionEnded() {
@@ -1043,11 +1048,6 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
     resize(previewWindow.width, previewWindow.height);
 
     renderer.setAnimationLoop(animate);
-
-    // Start loading the music
-    setTimeout(async () => {
-        soundAnalyzer = await initSoundAnalyzer(await initSound(torusMesh, "assets/audio/MIXST002-Portal.mp3"));
-    }, 533);
 }
 
 initScene(setupScene)
