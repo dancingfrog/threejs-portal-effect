@@ -594,7 +594,8 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
 
     // Start loading the music
     setTimeout(async () => {
-        soundAnalyzer = await initSoundAnalyzer(await initSound(torusMesh, "assets/audio/MIXST002-Portal.mp3"));
+        // soundAnalyzer = await initSoundAnalyzer(await initSound(torusMesh, "assets/audio/MIXST002-Portal.mp3"));
+        soundAnalyzer = await initSoundAnalyzer(await initSound(torusMesh, "assets/audio/the_bardos_beyond_christmas.mp3"));
     }, 533);
 
     const speed = 0.05;
