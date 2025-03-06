@@ -595,7 +595,10 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
     // Start loading the music
     setTimeout(async () => {
         // soundAnalyzer = await initSoundAnalyzer(await initSound(torusMesh, "assets/audio/MIXST002-Portal.mp3"));
-        soundAnalyzer = await initSoundAnalyzer(await initSound(torusMesh, "assets/audio/the_bardos_beyond_christmas.mp3"));
+        soundAnalyzer = await initSoundAnalyzer(await initSound(portalMesh, "assets/audio/the_bardos_beyond_christmas.mp3"));
+        console.log("Play sound!");
+        portalMesh['sound'].pause();
+        portalMesh['sound'].play();
     }, 533);
 
     const speed = 0.05;
@@ -682,11 +685,11 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
         //     clippingPlaneOutside
         // ];
 
-        portalRenderer.clippingPlanes = (isInsidePortal) ? [
-            clippingPlaneInside
-        ] : [
-            clippingPlaneOutside
-        ];
+        // portalRenderer.clippingPlanes = (isInsidePortal) ? [
+        //     clippingPlaneInside
+        // ] : [
+        //     clippingPlaneOutside
+        // ];
 
         portalRenderer.render(scene, camera);
         // renderer.render(scene, camera);
@@ -831,7 +834,7 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
                 clippingRightPlane,
                 clippingTopPlane,
                 clippingBottomPlane,
-                new THREE.Plane(clippingBottomUnitVector.clone(), -0.999)
+                // new THREE.Plane(clippingBottomUnitVector.clone(), -0.999)
             ];
         }
 
@@ -859,7 +862,7 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
                 clippingRightPlane,
                 clippingTopPlane,
                 clippingBottomPlane,
-                new THREE.Plane(clippingBottomUnitVector.clone(), -0.999)
+                // new THREE.Plane(clippingBottomUnitVector.clone(), -0.999)
             ]);
 
         uniforms.time["value"] = timeElapsed;
@@ -900,7 +903,7 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
             && typeof soundAnalyzer.getFrequencyData === "function"
         ) {
 
-            if (torusMesh.hasOwnProperty("sound") && !!torusMesh['sound'].isPlaying) {
+            if (portalMesh.hasOwnProperty("sound") && !!portalMesh['sound'].isPlaying) {
 
                 // sound analysis
                 soundData.push([...soundAnalyzer.getFrequencyData()]);
@@ -1013,10 +1016,10 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
                 currentSession.addEventListener("end", onSessionEnded);
             });
 
-        if (torusMesh.hasOwnProperty("sound")) {
+        if (portalMesh.hasOwnProperty("sound")) {
             console.log("Play sound!");
-            torusMesh['sound'].pause();
-            torusMesh['sound'].play();
+            portalMesh['sound'].pause();
+            portalMesh['sound'].play();
         }
     }
 

@@ -13,6 +13,10 @@ const RESOLUTION = 512;
 
 let sceneGroup, textureRepeatScale, uniforms, water;
 
+let sceneX = 0.0;
+let sceneY = 1.0;
+let sceneZ = -100.0;
+
 export default async function setupScene (renderer, scene, camera, controllers, player) {
 
     // Set player view
@@ -92,8 +96,8 @@ export default async function setupScene (renderer, scene, camera, controllers, 
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.3)
     scene.add(ambientLight)
 
-    // const pmremGenerator = new THREE.PMREMGenerator( renderer );
-    // const sceneEnv = new THREE.Scene();
+    const pmremGenerator = new THREE.PMREMGenerator( renderer );
+    const sceneEnv = new THREE.Scene();
 
     // Setup canvas texture
     const textureCanvas = document.createElement('canvas');
@@ -214,16 +218,18 @@ export default async function setupScene (renderer, scene, camera, controllers, 
     torusMesh.position.set(0, 1, 0);
 
 
-    // Place objects
-    // sceneGroup.add(water);
+    // Place objects in group
     sceneGroup.add(wave);
     sceneGroup.add(torusMesh);
 
     scene.add(sceneGroup);
 
-    sceneGroup.translateX(0.0);
-    sceneGroup.translateY(1.0);
-    sceneGroup.translateZ(-5.0);
+    sceneGroup.translateX(sceneX);
+    sceneGroup.translateY(sceneY);
+    sceneGroup.translateZ(sceneZ);
+
+    // // Add water directly
+    // scene.add(water);
 
     console.log(sceneGroup)
 
@@ -253,9 +259,19 @@ export default async function setupScene (renderer, scene, camera, controllers, 
 
         rotateMesh(torusMesh);
 
+        sceneZ += 0.05;
+
+        if (sceneZ < -5.0) {
+            sceneGroup.translateZ(0.01);
+        }
+
         // update the time uniform(s)
         wave.material.uniforms.time.value = time
         water.material.uniforms[ 'time' ].value += 0.1 / 60.0;
+
+        water.material.clippingPlanes = [
+            ...clippingPlanes
+        ];
 
         if (clippingPlanes !== null && clippingPlanes.length > 0) {
             propagateClippingPlanes (sceneGroup, clippingPlanes);
