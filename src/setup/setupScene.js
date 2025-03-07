@@ -3,6 +3,8 @@ import { Water } from "three/addons/objects/Water";
 
 import loadManager from "../loadManager";
 
+import rotatingTorus from "../objects/rotatingTorus";
+
 import defaultVertexShader from '../shaders/default/vertexShader.glsl';
 import defaultFragmentShader from '../shaders/default/fragmentShader.glsl';
 
@@ -11,92 +13,35 @@ import wavesVertexShader from '../shaders/waves/vertexShader.glsl';
 const SIZE = 5;
 const RESOLUTION = 512;
 
-let sceneGroup, textureRepeatScale, uniforms, water;
+let sceneGroup, textureRepeatScale, uniforms, dream_landed = false;
 
 let sceneX = 0.0;
 let sceneY = 1.0;
 let sceneZ = -100.0;
 
-export default async function setupScene (renderer, scene, camera, controllers, player) {
+export default function setupScene (renderer, scene, camera, controllers, player) {
 
     // Set player view
     player.add(camera);
 
     sceneGroup = new THREE.Group();
 
-    textureRepeatScale = 10
+    textureRepeatScale = 10;
 
-    uniforms = {
-        ...THREE.ShaderLib.physical.uniforms,
-        // diffuse: { value: "#5B82A6" }, // <= DO NO USE WITH THREE.ShaderChunk.meshphysical_frag ...
-        diffuse: { value: { "r": 0.36, "g": 0.51, "b": 0.65 } },
-        roughness: { value: 0.5 },
-        amplitude: { value: 0.25},
-        frequency: { value: 0.5 },
-        speed: { value: 0.3 },
-        // fogDensity: { value: 0.45 },
-        // fogColor: { value: new THREE.Vector3( 0, 0, 0 ) },
-        // uvScale: { value: new THREE.Vector2( 3.0, 1.0 ) },
-        // texture1: { value: cloudTexture },
-        // texture2: { value: lavaTexture },
-        time: { value: 1.0 }
+    const parameters = {
+        elevation: 2,
+        azimuth: 180
     };
 
-    const waveGeometry = new THREE.PlaneGeometry(SIZE, SIZE, RESOLUTION, RESOLUTION).rotateX(-Math.PI / 2);
-    const waveMaterial = new THREE.ShaderMaterial({
-        uniforms: uniforms,
-        vertexShader: wavesVertexShader, // vertex_shader,
-        fragmentShader: defaultFragmentShader,
-        lights: true,
-        side: THREE.DoubleSide,
-        defines: {
-            STANDARD: '',
-            PHYSICAL: '',
-        },
-        extensions: {
-            derivatives: true,
-        },
-        clipping: true,
-        clipShadows: true
-    });
-
-    const wave = new THREE.Mesh(waveGeometry, waveMaterial);
-
-    water = new Water(
-        new THREE.PlaneGeometry( 10000, 10000 ),
-        {
-            clipping: true,
-            clipShadows: true,
-            distortionScale: 1 / textureRepeatScale,
-            fog: scene.fog !== undefined,
-            textureWidth: 512,
-            textureHeight: 512,
-            waterNormals: new THREE.TextureLoader(loadManager).load( 'assets/material/textures/waternormals.jpg', function ( texture ) {
-                texture.repeat.set(textureRepeatScale, textureRepeatScale);
-                // texture.repeat.x = textureRepeatScale;
-                // texture.repeat.y = textureRepeatScale;
-                texture.wrapS = texture.wrapT = THREE.RepeatWrapping
-            } ),
-            sunDirection: new THREE.Vector3(),
-            sunColor: 0xffffff,
-            waterColor: 0x001e0f
-        }
-    );
-
-    water.rotation.x = - Math.PI / 2;
-    water.scale.x = water.scale.x; // / textureRepeatScale;
-    water.scale.y = water.scale.y; // / textureRepeatScale;
-    water.position.y = -textureRepeatScale/2;
-
     // Place lights
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.9)
-    directionalLight.position.set(-0.5, 10, -10)
-    scene.add(directionalLight)
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.9);
+    directionalLight.position.set(-0.5, 10, -10);
+    sceneGroup.add(directionalLight);
 
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.3)
-    scene.add(ambientLight)
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
+    sceneGroup.add(ambientLight);
 
-    const pmremGenerator = new THREE.PMREMGenerator( renderer );
+    // const pmremGenerator = new THREE.PMREMGenerator( renderer );
     const sceneEnv = new THREE.Scene();
 
     // Setup canvas texture
@@ -206,33 +151,6 @@ export default async function setupScene (renderer, scene, camera, controllers, 
         return new THREE.Mesh(geometry, material);
     }
 
-    function rotateMesh (mesh) {
-        mesh.rotation.x += 0.01;
-        mesh.rotation.y += 0.01;
-    }
-
-    // generateFaceLabel(textureCanvasCtx, '#F00', '#0FF', '+X');
-    generateFaceGrid(canvasTexture, '#09F', 10.0);
-
-    const torusMesh = createTorus(new THREE.Color(0xdddddd)); //, canvasTexture);
-    torusMesh.position.set(0, 1, 0);
-
-
-    // Place objects in group
-    sceneGroup.add(wave);
-    sceneGroup.add(torusMesh);
-
-    scene.add(sceneGroup);
-
-    sceneGroup.translateX(sceneX);
-    sceneGroup.translateY(sceneY);
-    sceneGroup.translateZ(sceneZ);
-
-    // // Add water directly
-    // scene.add(water);
-
-    console.log(sceneGroup)
-
     function propagateClippingPlanes (object, clippingPlanes) {
         if (object.hasOwnProperty("material")) {
             // console.log("Apply clipping planes to ", object);
@@ -249,6 +167,83 @@ export default async function setupScene (renderer, scene, camera, controllers, 
         }
     }
 
+    function rotateMesh (mesh) {
+        mesh.rotation.x += 0.01;
+        mesh.rotation.y += 0.01;
+    }
+
+    // generateFaceLabel(textureCanvasCtx, '#F00', '#0FF', '+X');
+    // generateFaceGrid(canvasTexture, '#09F', 10.0);
+
+
+    uniforms = {
+        ...THREE.ShaderLib.physical.uniforms,
+        // diffuse: { value: "#5B82A6" }, // <= DO NO USE WITH THREE.ShaderChunk.meshphysical_frag ...
+        diffuse: { value: { "r": 0.36, "g": 0.51, "b": 0.65 } },
+        roughness: { value: 0.5 },
+        amplitude: { value: 0.25},
+        frequency: { value: 0.5 },
+        speed: { value: 0.3 },
+        // fogDensity: { value: 0.45 },
+        // fogColor: { value: new THREE.Vector3( 0, 0, 0 ) },
+        // uvScale: { value: new THREE.Vector2( 3.0, 1.0 ) },
+        // texture1: { value: cloudTexture },
+        // texture2: { value: lavaTexture },
+        time: { value: 1.0 }
+    };
+
+    const waveGeometry = new THREE.PlaneGeometry(SIZE, SIZE, RESOLUTION, RESOLUTION).rotateX(-Math.PI / 2);
+    const waveMaterial = new THREE.ShaderMaterial({
+        uniforms: uniforms,
+        vertexShader: wavesVertexShader, // vertex_shader,
+        fragmentShader: defaultFragmentShader,
+        lights: true,
+        side: THREE.DoubleSide,
+        defines: {
+            STANDARD: '',
+            PHYSICAL: '',
+        },
+        extensions: {
+            derivatives: true,
+        },
+        clipping: true,
+        clipShadows: true
+    });
+
+    const waveMesh = new THREE.Mesh(waveGeometry, waveMaterial);
+    waveMesh.position.set(0, -1, 0);
+
+    const rotatingMesh = rotatingTorus;
+
+    rotatingMesh.material = new THREE.ShaderMaterial({
+        uniforms: uniforms,
+        vertexShader: defaultVertexShader,
+        fragmentShader: defaultFragmentShader,
+    });
+
+    const torusMesh = createTorus(new THREE.Color(0xdddddd)); //, canvasTexture);
+    torusMesh.material = new THREE.ShaderMaterial({
+        uniforms: uniforms,
+        vertexShader: defaultVertexShader,
+        fragmentShader: defaultFragmentShader,
+    });
+    torusMesh.position.set(0, 1, 0);
+
+    // Place objects in group
+    sceneGroup.add(waveMesh);
+    sceneGroup.add(rotatingMesh);
+    sceneGroup.add(torusMesh);
+
+    scene.add(sceneGroup);
+
+    sceneGroup.translateX(sceneX);
+    sceneGroup.translateY(sceneY);
+    sceneGroup.translateZ(sceneZ);
+
+    console.log(sceneGroup);
+
+    const zSpeed = 0.05;
+
     return function (currentSession, delta, time, data_in, sendData_out, clippingPlanes) {
 
         const data_out = {};
@@ -257,25 +252,38 @@ export default async function setupScene (renderer, scene, camera, controllers, 
             console.log("data_in:", data_in);
         }
 
-        rotateMesh(torusMesh);
-
-        sceneZ += 0.05;
-
-        if (sceneZ < -5.0) {
-            sceneGroup.translateZ(0.01);
-        }
-
-        // update the time uniform(s)
-        wave.material.uniforms.time.value = time
-        water.material.uniforms[ 'time' ].value += 0.1 / 60.0;
-
-        water.material.clippingPlanes = [
-            ...clippingPlanes
-        ];
-
         if (clippingPlanes !== null && clippingPlanes.length > 0) {
             propagateClippingPlanes (sceneGroup, clippingPlanes);
         }
+
+        rotateMesh(torusMesh);
+        sceneZ += zSpeed;
+
+        if (sceneZ < -2.5) {
+            sceneGroup.translateZ(zSpeed);
+
+            if (sceneZ < -25.0) {
+
+                rotatingMesh.rotX(0.05 * (5 * delta));
+                rotatingMesh.rotY(0.075 * (5 * delta));
+            } else {
+                rotatingMesh.rotation.set(
+                    rotatingMesh.rotation.x - rotatingMesh.rotation.x / 50,
+                    rotatingMesh.rotation.y - rotatingMesh.rotation.y / 50,
+                    rotatingMesh.rotation.z - rotatingMesh.rotation.z / 50);
+            }
+        } else {
+            rotatingMesh.rotation.set(0, 0, 0);
+
+
+            if (!dream_landed) {
+                dream_landed = true;
+                data_out["event"] = "dream_landed";
+            }
+        }
+
+        // update the time uniform(s)
+        waveMesh.material.uniforms.time.value = time
 
         if (data_out.hasOwnProperty("event") && typeof sendData_out === "function") {
             sendData_out(data_out);

@@ -587,14 +587,16 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
     setLayer(portalMesh, mapLayers.get("portal"));
     scene.add(portalMesh);
 
-    const torusMesh = createTorus(mapColors.get("grey"), canvasTexture);
-    torusMesh.position.set(0, 1, 0);
-    torusMesh.scale.set(2.0, 2.0, 2.0);
-    scene.add(torusMesh);
+    const songTorusMesh = createTorus(mapColors.get("grey"), canvasTexture);
+    songTorusMesh.position.set(0, 1, 0);
+    songTorusMesh.scale.set(2.0, 2.0, 2.0);
+    scene.add(songTorusMesh);
+
+    let songTorusZSpeed = 0;
 
     // Start loading the music
     setTimeout(async () => {
-        // soundAnalyzer = await initSoundAnalyzer(await initSound(torusMesh, "assets/audio/MIXST002-Portal.mp3"));
+        // soundAnalyzer = await initSoundAnalyzer(await initSound(songTorusMesh, "assets/audio/MIXST002-Portal.mp3"));
         soundAnalyzer = await initSoundAnalyzer(await initSound(portalMesh, "assets/audio/the_bardos_beyond_christmas.mp3"));
         console.log("Play sound!");
         portalMesh['sound'].pause();
@@ -679,7 +681,7 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
             camera.layers.enable(mapLayers.get("inside"));
         // }
 
-        // torusMesh.material.clippingPlanes = (isInsidePortal) ? [
+        // songTorusMesh.material.clippingPlanes = (isInsidePortal) ? [
         //     clippingPlaneInside
         // ] : [
         //     clippingPlaneOutside
@@ -842,20 +844,28 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
             skyInsideMesh.material.uniforms.time.value = timeElapsed; // <= DOES NOT WORK w/ MeshBasicMaterial
         }
 
-        torusMesh.material.clippingPlanes = [
+        songTorusMesh.material.clippingPlanes = [
             clippingPlaneOutside,
             clippingLeftPlane,
             clippingRightPlane,
             clippingTopPlane,
             clippingBottomPlane,
         ];
+        
+        function updateOuterScene( data) {
+            if (data.hasOwnProperty("event") && data["event"] === "dream_landed") {
+                songTorusZSpeed = -0.005;
+            }
+        }
+
+        songTorusMesh.translateZ(songTorusZSpeed);
 
         updateScene(
             currentSession,
             delta,
             timeElapsed,
             (Object.keys(sceneDataUpdate).length > 0) ? sceneDataUpdate : null,
-            null,
+            updateOuterScene,
             [
                 clippingPlaneOutside,
                 clippingLeftPlane,
@@ -917,7 +927,7 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
 
         // testPortalBounds();
 
-        updateTorus(torusMesh);
+        updateTorus(songTorusMesh);
         updateCameraPosition();
         updateCameraTarget();
 
