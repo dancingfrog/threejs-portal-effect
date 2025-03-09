@@ -16,12 +16,12 @@ function loadColorTexture (path) {
 }
 
 const meshMaterials = [
-    new THREE.MeshBasicMaterial(loadColorTexture('material/textures/flower-1.jpg')),
-    new THREE.MeshBasicMaterial(loadColorTexture('material/textures/flower-2.jpg')),
-    new THREE.MeshBasicMaterial(loadColorTexture('material/textures/flower-3.jpg')),
-    new THREE.MeshBasicMaterial(loadColorTexture('material/textures/flower-4.jpg')),
-    new THREE.MeshBasicMaterial(loadColorTexture('material/textures/flower-5.jpg')),
-    new THREE.MeshBasicMaterial(loadColorTexture('material/textures/flower-6.jpg')),
+    new THREE.MeshBasicMaterial(loadColorTexture('assets/material/textures/flower-1.jpg')),
+    new THREE.MeshBasicMaterial(loadColorTexture('assets/material/textures/flower-2.jpg')),
+    new THREE.MeshBasicMaterial(loadColorTexture('assets/material/textures/flower-3.jpg')),
+    new THREE.MeshBasicMaterial(loadColorTexture('assets/material/textures/flower-4.jpg')),
+    new THREE.MeshBasicMaterial(loadColorTexture('assets/material/textures/flower-5.jpg')),
+    new THREE.MeshBasicMaterial(loadColorTexture('assets/material/textures/flower-6.jpg')),
 ];
 
 export default meshMaterials;

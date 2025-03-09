@@ -24,34 +24,34 @@ let texture_loaded = false;
 const canvasBitmap = mipmap( 256, '#f00' );
 // const texture = new THREE.CanvasTexture(canvasBitmap.canvas);
 const textureLoader = new THREE.TextureLoader(loadManager);
-// const texture = textureLoader.load('material/textures/wall.jpg');
-const texture = textureLoader.load('material/textures/mip-low-res-enlarged.png')
+// const texture = textureLoader.load('assets/material/textures/wall.jpg');
+const texture = textureLoader.load('assets/material/textures/mip-low-res-enlarged.png')
 
-textureLoader.load('material/textures/mipmap-256.png', (t0) => {
+textureLoader.load('assets/material/textures/mipmap-256.png', (t0) => {
 
     console.log("Load mipmap[0]");
 
-    textureLoader.load('material/textures/mipmap-128.png', (t1) => {
+    textureLoader.load('assets/material/textures/mipmap-128.png', (t1) => {
 
         console.log("Load mipmap[1]");
 
-        textureLoader.load('material/textures/mipmap-64.png', (t2) => {
+        textureLoader.load('assets/material/textures/mipmap-64.png', (t2) => {
 
             console.log("Load mipmap[2]");
 
-            textureLoader.load('material/textures/mipmap-32.png', (t3) => {
+            textureLoader.load('assets/material/textures/mipmap-32.png', (t3) => {
 
                 console.log("Load mipmap[3]");
 
-                textureLoader.load('material/textures/mipmap-16.png', (t4) => {
+                textureLoader.load('assets/material/textures/mipmap-16.png', (t4) => {
 
                     console.log("Load mipmap[4]");
 
-                    textureLoader.load('material/textures/mipmap-8.png', (t5) => {
+                    textureLoader.load('assets/material/textures/mipmap-8.png', (t5) => {
 
                         console.log("Load mipmap[5]");
 
-                        textureLoader.load('material/textures/mipmap-4.png', (t6) => {
+                        textureLoader.load('assets/material/textures/mipmap-4.png', (t6) => {
 
                             console.log("Load mipmap[6]");
 
