@@ -301,6 +301,9 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
 
     player.add(camera);
 
+    // Make sure session is explicitly null before setting up the scene
+    currentSession = null;
+
     // Setup Scene
     const updateScene = setup(renderer, scene, camera, controllers, player, async (data) => {
 
