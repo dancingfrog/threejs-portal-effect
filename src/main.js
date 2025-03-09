@@ -23,6 +23,7 @@ import setupScene from "./setup/setupScene";
 
 import starrySkyVertexShader from "./shaders/starry-sky-texture/vertexShader.glsl";
 import starrySkyFragmentShader from "./shaders/starry-sky-texture/fragmentShader.glsl";
+import canvasTexture from "./material/canvasTexture";
 
 
 // Helper function to set nested meshes to layers
@@ -69,6 +70,7 @@ let wasOutside = true;
 
 let soundAnalyzer = null;
 const soundData = [];
+let soundMesh = null;
 
 function initSound (anchorObject, initSoundPath) {
     const listener = new THREE.AudioListener();
@@ -299,108 +301,31 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
 
     player.add(camera);
 
-    // // Setup Scene
-    const updateScene = await setup(renderer, scene, camera, controllers, player);
+    // Setup Scene
+    const updateScene = setup(renderer, scene, camera, controllers, player, async (data) => {
 
-    // Setup Light
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    directionalLight.position.set(0, 1, 1);
-    scene.add(directionalLight);
-
-    const hemisphereLight = new THREE.HemisphereLight(0xffffff, 0xffffff, 3);
-    scene.add(hemisphereLight);
-
-    // Setup canvas texture
-    const textureCanvas = document.createElement('canvas');
-    const canvasTexture = new THREE.CanvasTexture(textureCanvas);
-
-    function randInt(min, max) {
-        if (max === undefined) {
-            max = min;
-            min = 0;
+        if (data.hasOwnProperty("soundMesh")) {
+            soundMesh = data["soundMesh"];
+            soundAnalyzer = await initSoundAnalyzer(await initSound(soundMesh, "assets/audio/the_bardos_beyond_christmas.mp3"));
         }
-        return Math.random() * (max - min) + min | 0;
-    }
+    });
 
-    function drawRandomDot(texture) {
-        const ctx = texture.source.data.getContext('2d');
+    // // Start loading the music
+    // setTimeout(async (data) => {
+    //
+    //     if (data.hasOwnProperty("soundMesh")) {
+    //         soundMesh = data["soundMesh"];
+    //         soundAnalyzer = await initSoundAnalyzer(await initSound(soundMesh, "assets/audio/the_bardos_beyond_christmas.mp3"));
+    //     }
+    // }, 533);
 
-        ctx.strokeStyle = `#${randInt(0x1000000).toString(16).padStart(6, '0')}`;
-        ctx.fillStyle = `#${randInt(0x1000000).toString(16).padStart(6, '0')}`;
-        ctx.beginPath();
-
-        const x = randInt(ctx.canvas.width);
-        const y = randInt(ctx.canvas.height);
-        const radius = randInt(10, 64);
-        ctx.arc(x, y, radius, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.fill();
-
-        return ctx;
-    }
-
-    // for (let i = 0; i < 1000; i++) {
-    //     drawRandomDot(canvasTexture);
-    // }
-
-    function generateFaceLabel(texture, faceColor, textColor, text) {
-        const ctx = texture.source.data.getContext('2d');
-
-        ctx.canvas.width = ctx.canvas.height = 100;
-
-        ctx.fillStyle = "transparent";
-        ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-        const {width, height} = ctx.canvas;
-        ctx.fillStyle = faceColor;
-        ctx.fillRect(0, 0, width, height);
-        ctx.font = `${width * 0.7}px sans-serif`;
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillStyle = textColor;
-        ctx.fillText(text, width / 2, height / 2);
-
-        return ctx;
-    }
-
-    function generateFaceGrid(texture, gridColor, gridSpacingPixels) {
-
-        const textureRepeatScale = gridSpacingPixels * gridSpacingPixels;
-        texture.repeat.set(textureRepeatScale, textureRepeatScale);
-        texture.repeat.x = textureRepeatScale;
-        texture.repeat.y = textureRepeatScale;
-        texture.wrapS = texture.wrapT = THREE.RepeatWrapping
-        texture.colorSpace = THREE.SRGBColorSpace;
-
-        const ctx = texture.source.data.getContext('2d');
-
-        ctx.canvas.width = ctx.canvas.height = textureRepeatScale;
-
-        const w = ctx.canvas.width,
-            h = ctx.canvas.height;
-
-        ctx.fillStyle = "transparent";
-        ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-
-        ctx.strokeStyle = gridColor;
-        ctx.beginPath();
-        for (let x=gridSpacingPixels/2; x<=w; x+=gridSpacingPixels){
-            ctx.save();
-            ctx.translate(0.5, 0);
-            ctx.moveTo(x-0.5,0);      // 0.5 offset so that 1px lines are crisp
-            ctx.lineTo(x-0.5,h);
-            ctx.restore();
-        }
-        for (let y=gridSpacingPixels/2;y<=h;y+=gridSpacingPixels){
-            ctx.save();
-            ctx.translate(0, 0.5);
-            ctx.moveTo(0,y-0.5);
-            ctx.lineTo(w,y-0.5);
-            ctx.restore();
-        }
-        ctx.stroke();
-
-        return ctx;
-    }
+    // // Setup Light
+    // const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    // directionalLight.position.set(0, 1, 1);
+    // scene.add(directionalLight);
+    //
+    // const hemisphereLight = new THREE.HemisphereLight(0xffffff, 0xffffff, 3);
+    // scene.add(hemisphereLight);
 
     function createGround(width, height, groundColor, groundTexture) {
         const geometry = new THREE.PlaneGeometry(width, width, 1, 1);
@@ -557,13 +482,10 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
         return new THREE.Mesh(geometry, material);
     }
 
-    function updateTorus(mesh) {
-        mesh.rotation.x += 0.01;
-        mesh.rotation.y += 0.01;
-    }
-
-    // generateFaceLabel(textureCanvasCtx, '#F00', '#0FF', '+X');
-    generateFaceGrid(canvasTexture, '#09F', 10.0);
+    // function updateTorus(mesh) {
+    //     mesh.rotation.x += 0.01;
+    //     mesh.rotation.y += 0.01;
+    // }
 
     console.log("canvasTexture:", canvasTexture);
 
@@ -576,9 +498,9 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
     setLayer(skyInsideMesh, mapLayers.get("inside"));
     scene.add(skyInsideMesh);
 
-    const shelfInsideMesh = createGround(100, 1, mapColors.get("green"), canvasTexture);
-    setLayer(shelfInsideMesh, mapLayers.get("inside"));
-    scene.add(shelfInsideMesh);
+    // const shelfInsideMesh = createGround(100, 1, mapColors.get("green"), canvasTexture);
+    // setLayer(shelfInsideMesh, mapLayers.get("inside"));
+    // scene.add(shelfInsideMesh);
 
     const portalRadialBounds = 1.0; // relative to portal size
 
@@ -587,15 +509,10 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
     setLayer(portalMesh, mapLayers.get("portal"));
     scene.add(portalMesh);
 
-    const torusMesh = createTorus(mapColors.get("grey"), canvasTexture);
-    torusMesh.position.set(0, 1, 0);
-    torusMesh.scale.set(2.0, 2.0, 2.0);
-    scene.add(torusMesh);
-
-    // Start loading the music
-    setTimeout(async () => {
-        soundAnalyzer = await initSoundAnalyzer(await initSound(torusMesh, "assets/audio/MIXST002-Portal.mp3"));
-    }, 533);
+    // const torusMesh = createTorus(mapColors.get("grey"), canvasTexture);
+    // torusMesh.position.set(0, 1, 0);
+    // torusMesh.scale.set(2.0, 2.0, 2.0);
+    // scene.add(torusMesh);
 
     const speed = 0.05;
     const directionVector = new THREE.Vector3();
@@ -681,11 +598,11 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
         //     clippingPlaneOutside
         // ];
 
-        portalRenderer.clippingPlanes = (isInsidePortal) ? [
-            clippingPlaneInside
-        ] : [
-            clippingPlaneOutside
-        ];
+        // portalRenderer.clippingPlanes = (isInsidePortal) ? [
+        //     clippingPlaneInside
+        // ] : [
+        //     clippingPlaneOutside
+        // ];
 
         portalRenderer.render(scene, camera);
         // renderer.render(scene, camera);
@@ -830,7 +747,7 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
                 clippingRightPlane,
                 clippingTopPlane,
                 clippingBottomPlane,
-                new THREE.Plane(clippingBottomUnitVector.clone(), -0.999)
+                // new THREE.Plane(clippingBottomUnitVector.clone(), -0.999)
             ];
         }
 
@@ -838,13 +755,13 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
             skyInsideMesh.material.uniforms.time.value = timeElapsed; // <= DOES NOT WORK w/ MeshBasicMaterial
         }
 
-        torusMesh.material.clippingPlanes = [
-            clippingPlaneOutside,
-            clippingLeftPlane,
-            clippingRightPlane,
-            clippingTopPlane,
-            clippingBottomPlane,
-        ];
+        // torusMesh.material.clippingPlanes = [
+        //     clippingPlaneOutside,
+        //     clippingLeftPlane,
+        //     clippingRightPlane,
+        //     clippingTopPlane,
+        //     clippingBottomPlane,
+        // ];
 
         updateScene(
             currentSession,
@@ -858,7 +775,7 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
                 clippingRightPlane,
                 clippingTopPlane,
                 clippingBottomPlane,
-                new THREE.Plane(clippingBottomUnitVector.clone(), -0.999)
+                // new THREE.Plane(clippingBottomUnitVector.clone(), -0.999)
             ]);
 
         uniforms.time["value"] = timeElapsed;
@@ -899,7 +816,7 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
             && typeof soundAnalyzer.getFrequencyData === "function"
         ) {
 
-            if (torusMesh.hasOwnProperty("sound") && !!torusMesh['sound'].isPlaying) {
+            if (soundMesh.hasOwnProperty("sound") && !!soundMesh['sound'].isPlaying) {
 
                 // sound analysis
                 soundData.push([...soundAnalyzer.getFrequencyData()]);
@@ -913,7 +830,7 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
 
         // testPortalBounds();
 
-        updateTorus(torusMesh);
+        // updateTorus(torusMesh);
         updateCameraPosition();
         updateCameraTarget();
 
@@ -1012,10 +929,10 @@ async function initScene (setup = (scene, camera, controllers, players) => {}) {
                 currentSession.addEventListener("end", onSessionEnded);
             });
 
-        if (torusMesh.hasOwnProperty("sound")) {
+        if (soundMesh.hasOwnProperty("sound")) {
             console.log("Play sound!");
-            torusMesh['sound'].pause();
-            torusMesh['sound'].play();
+            soundMesh['sound'].pause();
+            soundMesh['sound'].play();
         }
     }
 
