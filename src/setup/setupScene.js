@@ -95,7 +95,7 @@ export default function setupScene (renderer, scene, camera, controllers, player
 
     let sceneX = 0.0;
     let sceneY = 1.0;
-    let sceneZ = -100.0;
+    let sceneZ = -50.0;
 
     // Place lights
     const directionalLight = new THREE.DirectionalLight(0xffffff, 0.9);
