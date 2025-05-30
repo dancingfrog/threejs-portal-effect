@@ -28,6 +28,7 @@
     "three": "^0.170.0"
   },
   "devDependencies": {
+    "@bubblewrap/cli": "^1.22.6",
     "@esbuild-plugins/node-globals-polyfill": "^0.2.3",
     "@esbuild-plugins/node-modules-polyfill": "^0.2.2",
     "@vitejs/plugin-basic-ssl": "^1.2.0",

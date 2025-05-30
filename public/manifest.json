@@ -1,0 +1,22 @@
+{
+  "name": "WebXR Portal Effect",
+  "short_name": "WebXRPortal",
+  "description": "WebXR demo of how to use clipping planes to construct/project a WebXR scene in mixed reality",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#000000",
+  "orientation": "portrait-primary",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/favicon.ico",
+      "sizes": "64x64",
+      "type": "image/x-icon",
+      "purpose": "any"
+    }
+  ],
+  "categories": ["productivity", "utilities"],
+  "lang": "en",
+  "dir": "ltr"
+}
