@@ -14,6 +14,12 @@
       "sizes": "64x64",
       "type": "image/x-icon",
       "purpose": "any"
+    },
+    {
+      "src": "/favicon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
     }
   ],
   "categories": ["productivity", "utilities"],
